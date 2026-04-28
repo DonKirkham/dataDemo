@@ -64,15 +64,17 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
     }
 
     const site = this.properties.sites[0];
+    const siteUrl = this._toAbsoluteSiteUrl(site.url);
+    const siteId = site.id || this.context.pageContext.site.id.toString();
     const listIdentifier: IListIdentifier = { id: list.id, title: list.title };
 
-    Logger.write(`[DataDemo] render: mounting DataDemo component for site=${site.url}, list=${listIdentifier.title}`, LogLevel.Info);
+    Logger.write(`[DataDemo] render: mounting DataDemo component for site=${siteUrl}, list=${listIdentifier.title}`, LogLevel.Info);
 
     const element: React.ReactElement<IDataDemoProps> = React.createElement(
       DataDemo,
       {
         factory: this._factory,
-        site: { url: site.url || '', id: site.id || '' },
+        site: { url: siteUrl, id: siteId },
         list: listIdentifier
       }
     );
@@ -128,6 +130,17 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
   private _getSiteUrl(): string | undefined {
     const sites = this.properties.sites;
     return sites && sites.length > 0 ? sites[0].url : undefined;
+  }
+
+  private _toAbsoluteSiteUrl(siteUrl: string | undefined): string {
+    if (!siteUrl || siteUrl === '/') {
+      return this.context.pageContext.web.absoluteUrl;
+    }
+    if (/^https?:\/\//i.test(siteUrl)) {
+      return siteUrl;
+    }
+    const origin = new URL(this.context.pageContext.web.absoluteUrl).origin;
+    return `${origin}${siteUrl.startsWith('/') ? '' : '/'}${siteUrl}`;
   }
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {

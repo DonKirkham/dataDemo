@@ -61,6 +61,20 @@
   border-color: var(--redLight, #f1bbbc);
 }
 
+.required {
+  display: inline-block;
+  padding: 5px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: "[theme:bodyText, default: #323130]";
+  color: var(--bodyText);
+
+  span {
+    color: "[theme:redDark, default: #a4262c]";
+    color: var(--redDark, #a4262c);
+  }
+}
+
 .placeholder {
   padding: 40px 20px;
   text-align: center;

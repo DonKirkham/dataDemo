@@ -23,7 +23,11 @@ export interface ISiteInfo {
 }
 
 export class SpServiceFactory {
-  constructor(private context: WebPartContext) {}
+  constructor(private _context: WebPartContext) {}
+
+  public get context(): WebPartContext {
+    return this._context;
+  }
 
   public async create(transport: Transport, endpoint: Endpoint, site: ISiteInfo): Promise<ISpService> {
     Logger.write(`[DataDemo] SpServiceFactory.create: ${transport} + ${endpoint} for site=${site.url}`, LogLevel.Info);

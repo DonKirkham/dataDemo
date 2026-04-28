@@ -4,7 +4,7 @@
 import * as React from 'react';
 import styles from './DataDemo.module.scss';
 import type { IDataDemoProps } from './IDataDemoProps';
-import { IListItem } from '../models/IListItem';
+import { IListItem, ISpeaker, SessionType } from '../models/IListItem';
 import { ISpService } from '../services/ISpService';
 import { Transport, Endpoint } from '../services/SpServiceFactory';
 import JokePanel from './JokePanel';
@@ -30,8 +30,23 @@ import {
   DialogType,
   DialogFooter,
   Pivot,
-  PivotItem
+  PivotItem,
+  DatePicker,
+  Dropdown,
+  IDropdownOption
 } from '@fluentui/react';
+import { PeoplePicker, PrincipalType } from '@pnp/spfx-controls-react/lib/PeoplePicker';
+
+const SESSION_TYPE_OPTIONS: IDropdownOption[] = [
+  { key: '30 minute session', text: '30 minute session' },
+  { key: '45 minute session', text: '45 minute session' },
+  { key: '50 minute session', text: '50 minute session' },
+  { key: '60 minute session', text: '60 minute session' },
+  { key: '70 minute session', text: '70 minute session' },
+  { key: '75 minute session', text: '75 minute session' },
+  { key: 'Half day workshop', text: 'Half day workshop' },
+  { key: 'Full day workshop', text: 'Full day workshop' }
+];
 
 const stackTokens: IStackTokens = { childrenGap: 10 };
 
@@ -336,23 +351,94 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
           onDismiss={onCloseDialog}
           dialogContentProps={{
             type: DialogType.normal,
-            title: isEditing ? 'Edit Item' : 'Add Item'
+            title: isEditing ? 'Edit Event' : 'Add Event'
           }}
           modalProps={{ isBlocking: true }}
+          minWidth={520}
         >
-          <Stack tokens={stackTokens}>
+          <Stack tokens={stackTokens} key={isEditing ? `edit-${editItem.Id ?? 'new'}` : 'add'}>
             <TextField
-              label="Title"
+              label="Event"
               value={editItem.Title}
               onChange={(_e, val) => setEditItem({ ...editItem, Title: val || '' })}
               required
               data-automation-id="dataDemo-input-title"
+            />
+            <TextField
+              label="Session"
+              value={editItem.Session ?? ''}
+              onChange={(_e, val) => setEditItem({ ...editItem, Session: val || '' })}
+              data-automation-id="dataDemo-input-session"
+            />
+            <DatePicker
+              label="Date"
+              textField={{
+                onRenderLabel: () => (
+                  <label className={styles.required}>
+                    Date<span aria-hidden="true"> *</span>
+                  </label>
+                )
+              }}
+              value={editItem.SessionDate ? new Date(editItem.SessionDate) : undefined}
+              onSelectDate={(d) =>
+                setEditItem({ ...editItem, SessionDate: d ? d.toISOString() : undefined })
+              }
+              data-automation-id="dataDemo-input-sessionDate"
+            />
+            <Dropdown
+              label="Session Type"
+              selectedKey={editItem.SessionType}
+              options={SESSION_TYPE_OPTIONS}
+              onChange={(_e, opt) =>
+                setEditItem({ ...editItem, SessionType: opt?.key as SessionType })
+              }
+              data-automation-id="dataDemo-input-sessionType"
+            />
+            {factory && (
+              <PeoplePicker
+                context={{
+                  absoluteUrl: factory.context.pageContext.web.absoluteUrl,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  msGraphClientFactory: factory.context.msGraphClientFactory as any,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  spHttpClient: factory.context.spHttpClient as any
+                }}
+                webAbsoluteUrl={site?.url}
+                titleText={endpoint === 'MS Graph (SP)' ? 'Speaker (read-only on Graph)' : 'Speaker'}
+                personSelectionLimit={10}
+                principalTypes={[PrincipalType.User]}
+                resolveDelay={300}
+                disabled={endpoint === 'MS Graph (SP)'}
+                defaultSelectedUsers={editItem.Speaker?.map((s) => s.EMail ?? s.Title) ?? []}
+                onChange={(items) => {
+                  const speakers: ISpeaker[] = items.map((p) => ({
+                    Id: parseInt(p.id ?? '0', 10),
+                    Title: p.text ?? '',
+                    EMail: p.secondaryText
+                  }));
+                  setEditItem({ ...editItem, Speaker: speakers });
+                }}
+                ensureUser
+                data-automation-id="dataDemo-input-speaker"
+              />
+            )}
+            <TextField
+              label="Event Site URL"
+              value={editItem.EventSite?.Url ?? ''}
+              onChange={(_e, val) =>
+                setEditItem({
+                  ...editItem,
+                  EventSite: { Url: val || '', Description: val || '' }
+                })
+              }
+              data-automation-id="dataDemo-input-eventSiteUrl"
             />
           </Stack>
           <DialogFooter>
             <PrimaryButton
               text="Save"
               onClick={onSaveItem}
+              disabled={!editItem.Title || !editItem.SessionDate}
               data-automation-id="dataDemo-button-save"
             />
             <DefaultButton
