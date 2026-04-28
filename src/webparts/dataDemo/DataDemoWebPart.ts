@@ -24,7 +24,7 @@ import { Placeholder } from '@pnp/spfx-controls-react';
 import DataDemo from './components/DataDemo';
 import { IDataDemoProps } from './components/IDataDemoProps';
 import { SpServiceFactory } from './services/SpServiceFactory';
-import { IListIdentifier } from './services/ISpService';
+import { IListIdentifier } from './models/ISpService';
 
 export interface IStoredList {
   id: string;

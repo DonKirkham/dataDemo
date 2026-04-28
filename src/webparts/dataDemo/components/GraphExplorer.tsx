@@ -14,9 +14,7 @@ import {
   Spinner,
   SpinnerSize
 } from '@fluentui/react';
-import { MSGraphClientV3 } from '@microsoft/sp-http';
-import { Logger, LogLevel } from '@pnp/logging';
-import { SpServiceFactory } from '../services/SpServiceFactory';
+import { IGraphQueryService } from '../models/IGraphQueryService';
 import styles from './DataDemo.module.scss';
 
 const stackTokens: IStackTokens = { childrenGap: 10 };
@@ -32,16 +30,15 @@ const PRESET_PATHS: IDropdownOption[] = [
 const DEFAULT_PATH = '/me';
 
 export interface IGraphExplorerProps {
-  factory: SpServiceFactory;
+  service: IGraphQueryService;
 }
 
-const GraphExplorer: React.FC<IGraphExplorerProps> = ({ factory }) => {
+const GraphExplorer: React.FC<IGraphExplorerProps> = ({ service }) => {
   const [path, setPath] = React.useState<string>(DEFAULT_PATH);
   const [loading, setLoading] = React.useState(false);
   const [response, setResponse] = React.useState<unknown>(undefined);
   const [errorBody, setErrorBody] = React.useState<unknown>(undefined);
   const [errorMessage, setErrorMessage] = React.useState<string | undefined>(undefined);
-  const clientRef = React.useRef<MSGraphClientV3 | undefined>(undefined);
 
   const onPresetChanged = React.useCallback((_e: unknown, option?: IDropdownOption): void => {
     if (option) {
@@ -63,22 +60,16 @@ const GraphExplorer: React.FC<IGraphExplorerProps> = ({ factory }) => {
   const onRun = React.useCallback(async (): Promise<void> => {
     if (!path) return;
 
-    Logger.write(`[DataDemo] GraphExplorer.run: path=${path}`, LogLevel.Info);
     setLoading(true);
     setResponse(undefined);
     setErrorBody(undefined);
     setErrorMessage(undefined);
 
     try {
-      if (!clientRef.current) {
-        clientRef.current = await factory.createGraphClient();
-      }
-      const result = await clientRef.current.api(path).version('v1.0').get();
-      Logger.write(`[DataDemo] GraphExplorer.run: success`, LogLevel.Verbose);
+      const result = await service.runQuery(path);
       setResponse(result);
     } catch (err) {
       const e = err as { message?: string; statusCode?: number; body?: unknown; code?: string };
-      Logger.write(`[DataDemo] GraphExplorer.run failed: ${e.message ?? 'unknown'}`, LogLevel.Error);
       setErrorMessage(e.message ?? 'Request failed');
       // Graph client errors typically expose body as a JSON string
       let parsedBody: unknown = e.body;
@@ -93,7 +84,7 @@ const GraphExplorer: React.FC<IGraphExplorerProps> = ({ factory }) => {
     } finally {
       setLoading(false);
     }
-  }, [factory, path]);
+  }, [service, path]);
 
   return (
     <Stack tokens={stackTokens} data-automation-id="dataDemo-container-graphExplorer">

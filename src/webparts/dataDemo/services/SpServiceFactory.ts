@@ -1,20 +1,21 @@
-// ABOUTME: Factory that creates the appropriate ISpService implementation based on the selected approach.
+// ABOUTME: Factory that creates the appropriate service implementation based on the selected approach.
 // ABOUTME: Handles PnP JS initialization (spfi/graphfi) and Graph client setup for each service type.
 
 import { WebPartContext } from '@microsoft/sp-webpart-base';
-import { MSGraphClientV3 } from '@microsoft/sp-http';
 import { spfi, SPFx as spSPFx } from '@pnp/sp';
 import { graphfi, SPFx as graphSPFx } from '@pnp/graph';
-import { Logger, LogLevel } from '@pnp/logging';
-import { ISpService } from './ISpService';
-import { RestSpService } from './RestSpService';
-import { PnPSpService } from './PnPSpService';
-import { GraphSpService } from './GraphSpService';
-import { PnPGraphService } from './PnPGraphService';
-import { AnonymousRestService } from './AnonymousRestService';
-import { AnonymousPnPService } from './AnonymousPnPService';
+import { ISpService } from '../models/ISpService';
+import { IJokeService } from '../models/IJokeService';
+import { IGraphQueryService } from '../models/IGraphQueryService';
+import { SpfxSpService } from './SpfxSpService';
+import { PnPjsSpService } from './PnPjsSpService';
+import { SpfxGraphSpService } from './SpfxGraphSpService';
+import { PnPjsGraphSpService } from './PnPjsGraphSpService';
+import { SpfxAnonymousService } from './SpfxAnonymousService';
+import { PnPjsAnonymousService } from './PnPjsAnonymousService';
+import { SpfxGraphQueryService } from './SpfxGraphQueryService';
 
-export type Transport = 'REST' | 'PnPjs';
+export type Transport = 'SPFx' | 'PnPjs';
 export type Endpoint = 'SharePoint' | 'MS Graph' | 'MS Graph (SP)' | 'Anonymous' | 'Simple Auth' | 'Entra App';
 
 export interface ISiteInfo {
@@ -29,49 +30,43 @@ export class SpServiceFactory {
     return this._context;
   }
 
-  public async create(transport: Transport, endpoint: Endpoint, site: ISiteInfo): Promise<ISpService> {
-    Logger.write(`[DataDemo] SpServiceFactory.create: ${transport} + ${endpoint} for site=${site.url}`, LogLevel.Info);
-
-    if (transport === 'REST' && endpoint === 'SharePoint') {
-      Logger.write('[DataDemo] SpServiceFactory: building RestSpService', LogLevel.Verbose);
-      return new RestSpService(this.context.spHttpClient, site.url);
+  public async createSpService(transport: Transport, endpoint: Endpoint, site: ISiteInfo): Promise<ISpService> {
+    if (transport === 'SPFx' && endpoint === 'SharePoint') {
+      return new SpfxSpService(this.context.spHttpClient, site.url);
     }
 
-    if (transport === 'REST' && endpoint === 'MS Graph (SP)') {
-      Logger.write('[DataDemo] SpServiceFactory: building GraphSpService', LogLevel.Verbose);
+    if (transport === 'SPFx' && endpoint === 'MS Graph (SP)') {
       const graphClient = await this.context.msGraphClientFactory.getClient('3');
-      return new GraphSpService(graphClient, site.id);
+      return new SpfxGraphSpService(graphClient, site.id);
     }
 
     if (transport === 'PnPjs' && endpoint === 'SharePoint') {
-      Logger.write('[DataDemo] SpServiceFactory: building PnPSpService', LogLevel.Verbose);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sp = spfi(site.url).using(spSPFx(this.context as any));
-      return new PnPSpService(sp);
+      return new PnPjsSpService(sp);
     }
 
     if (transport === 'PnPjs' && endpoint === 'MS Graph (SP)') {
-      Logger.write('[DataDemo] SpServiceFactory: building PnPGraphService', LogLevel.Verbose);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const graph = graphfi().using(graphSPFx(this.context as any));
-      return new PnPGraphService(graph, site.id);
+      return new PnPjsGraphSpService(graph, site.id);
     }
 
-    if (transport === 'REST' && endpoint === 'Anonymous') {
-      Logger.write('[DataDemo] SpServiceFactory: building AnonymousRestService', LogLevel.Verbose);
-      return new AnonymousRestService(this.context.httpClient);
-    }
-
-    if (transport === 'PnPjs' && endpoint === 'Anonymous') {
-      Logger.write('[DataDemo] SpServiceFactory: building AnonymousPnPService', LogLevel.Verbose);
-      return new AnonymousPnPService();
-    }
-
-    Logger.write(`[DataDemo] SpServiceFactory: unsupported combination ${transport} + ${endpoint}`, LogLevel.Error);
-    throw new Error(`Unsupported combination: ${transport} + ${endpoint}`);
+    throw new Error(`Unsupported SharePoint combination: ${transport} + ${endpoint}`);
   }
 
-  public async createGraphClient(): Promise<MSGraphClientV3> {
-    return this.context.msGraphClientFactory.getClient('3');
+  public createJokeService(transport: Transport): IJokeService {
+    if (transport === 'SPFx') {
+      return new SpfxAnonymousService(this.context.httpClient);
+    }
+    if (transport === 'PnPjs') {
+      return new PnPjsAnonymousService();
+    }
+    throw new Error(`Unsupported transport for joke service: ${transport}`);
+  }
+
+  public async createGraphQueryService(): Promise<IGraphQueryService> {
+    const graphClient = await this.context.msGraphClientFactory.getClient('3');
+    return new SpfxGraphQueryService(graphClient);
   }
 }

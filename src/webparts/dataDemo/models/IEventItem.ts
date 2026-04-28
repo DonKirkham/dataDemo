@@ -28,7 +28,7 @@ export interface IThumbnailField {
   fileName?: string;
 }
 
-export interface IListItem {
+export interface IEventItem {
   Id?: number;
   Title: string;
   Speaker?: ISpeaker[];
