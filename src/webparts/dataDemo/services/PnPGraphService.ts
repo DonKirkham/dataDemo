@@ -5,14 +5,57 @@ import { GraphFI } from '@pnp/graph';
 import '@pnp/graph/sites';
 import '@pnp/graph/lists';
 import '@pnp/graph/list-item';
+import { InjectHeaders } from '@pnp/queryable';
 import { Logger, LogLevel } from '@pnp/logging';
 import { logDebug } from './logDebug';
-import { IListItem } from '../models/IListItem';
+import { IListItem, ISpeaker, IUrlField, SessionType } from '../models/IListItem';
 import { ISpService, IListIdentifier } from './ISpService';
+import { startOfTodayIsoNoMs } from './dateUtils';
+
+interface IGraphSpeakerLookup {
+  LookupId: number;
+  LookupValue?: string;
+  Email?: string;
+}
+
+interface IGraphUrlField {
+  Description?: string;
+  Url?: string;
+}
 
 interface IGraphFields {
   Title?: string;
-  id?: string;
+  Session?: string;
+  SessionDate?: string;
+  SessionType?: string;
+  EventSite?: string | IGraphUrlField;
+  Speaker?: IGraphSpeakerLookup[];
+}
+
+const FIELD_SELECT = 'Title,Session,SessionDate,SessionType,EventSite,Speaker';
+
+function toListItem(rawId: string, fields: IGraphFields | undefined): IListItem {
+  const f = fields ?? {};
+  const speakers: ISpeaker[] | undefined = f.Speaker?.map((s) => ({
+    Id: s.LookupId,
+    Title: s.LookupValue ?? '',
+    EMail: s.Email
+  }));
+  const eventSite: IUrlField | undefined = typeof f.EventSite === 'string'
+    ? { Url: f.EventSite }
+    : f.EventSite?.Url
+      ? { Url: f.EventSite.Url, Description: f.EventSite.Description }
+      : undefined;
+
+  return {
+    Id: parseInt(rawId, 10),
+    Title: f.Title ?? '',
+    Session: f.Session,
+    SessionDate: f.SessionDate,
+    SessionType: f.SessionType as SessionType | undefined,
+    EventSite: eventSite,
+    Speaker: speakers
+  };
 }
 
 export class PnPGraphService implements ISpService {
@@ -23,38 +66,40 @@ export class PnPGraphService implements ISpService {
 
   public async getItems(list: IListIdentifier): Promise<IListItem[]> {
     Logger.write(`[DataDemo] PnPGraphService.getItems: list=${list.id}`, LogLevel.Info);
-    const items = await this.graph.sites
+    const itemsQuery = this.graph.sites
       .getById(this.siteId)
       .lists
       .getById(list.id)
       .items
-      .expand('fields')();
+      .using(InjectHeaders({ Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' }));
+
+    itemsQuery.query.set('expand', `fields(select=${FIELD_SELECT})`);
+    itemsQuery.query.set('$filter', `fields/SessionDate ge '${startOfTodayIsoNoMs()}'`);
+    itemsQuery.query.set('$orderby', 'fields/SessionDate asc');
+
+    const items = await itemsQuery();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = items.map((item: any) => ({
-      Id: parseInt(item.id, 10),
-      Title: (item.fields as IGraphFields)?.Title || ''
-    }));
+    const result = items.map((item: any) => toListItem(item.id, item.fields as IGraphFields));
     logDebug('PnPGraphService.getItems result:', result);
     return result;
   }
 
   public async getItem(list: IListIdentifier, itemId: number): Promise<IListItem> {
     Logger.write(`[DataDemo] PnPGraphService.getItem: list=${list.id}, id=${itemId}`, LogLevel.Info);
-    const item = await this.graph.sites
+    const itemQuery = this.graph.sites
       .getById(this.siteId)
       .lists
       .getById(list.id)
       .items
-      .getById(itemId.toString())
-      .expand('fields')();
+      .getById(itemId.toString());
+
+    itemQuery.query.set('expand', `fields(select=${FIELD_SELECT})`);
+
+    const item = await itemQuery();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fields = (item as any).fields as IGraphFields;
-    const result = {
-      Id: itemId,
-      Title: fields?.Title || ''
-    };
+    const result = toListItem((item as any).id ?? itemId.toString(), (item as any).fields as IGraphFields);
     logDebug('PnPGraphService.getItem result:', result);
     return result;
   }

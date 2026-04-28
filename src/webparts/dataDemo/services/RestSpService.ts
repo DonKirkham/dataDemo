@@ -6,6 +6,7 @@ import { Logger, LogLevel } from '@pnp/logging';
 import { logDebug } from './logDebug';
 import { IListItem } from '../models/IListItem';
 import { ISpService, IListIdentifier } from './ISpService';
+import { startOfTodayIso } from './dateUtils';
 
 export class RestSpService implements ISpService {
   constructor(
@@ -13,9 +14,25 @@ export class RestSpService implements ISpService {
     private siteUrl: string
   ) {}
 
+  private static readonly SELECT = [
+    'Id',
+    'Title',
+    'Session',
+    'SessionDate',
+    'SessionType',
+    'EventSite',
+    'SessionLink',
+    'Speaker/Id',
+    'Speaker/Title',
+    'Speaker/EMail'
+  ].join(',');
+
+  private static readonly EXPAND = 'Speaker';
+
   public async getItems(list: IListIdentifier): Promise<IListItem[]> {
     Logger.write(`[DataDemo] RestSpService.getItems: list=${list.title}`, LogLevel.Info);
-    const url = `${this.siteUrl}/_api/web/lists/getbytitle('${list.title}')/items?$select=Id,Title`;
+    const filter = encodeURIComponent(`SessionDate ge datetime'${startOfTodayIso()}'`);
+    const url = `${this.siteUrl}/_api/web/lists/getbytitle('${list.title}')/items?$select=${RestSpService.SELECT}&$expand=${RestSpService.EXPAND}&$filter=${filter}&$orderby=SessionDate asc`;
     const response: SPHttpClientResponse = await this.spHttpClient.get(
       url,
       SPHttpClient.configurations.v1
@@ -32,7 +49,7 @@ export class RestSpService implements ISpService {
 
   public async getItem(list: IListIdentifier, itemId: number): Promise<IListItem> {
     Logger.write(`[DataDemo] RestSpService.getItem: list=${list.title}, id=${itemId}`, LogLevel.Info);
-    const url = `${this.siteUrl}/_api/web/lists/getbytitle('${list.title}')/items(${itemId})?$select=Id,Title`;
+    const url = `${this.siteUrl}/_api/web/lists/getbytitle('${list.title}')/items(${itemId})?$select=${RestSpService.SELECT}&$expand=${RestSpService.EXPAND}`;
     const response: SPHttpClientResponse = await this.spHttpClient.get(
       url,
       SPHttpClient.configurations.v1

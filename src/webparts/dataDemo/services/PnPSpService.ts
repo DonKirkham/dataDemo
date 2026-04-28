@@ -9,16 +9,36 @@ import { Logger, LogLevel } from '@pnp/logging';
 import { logDebug } from './logDebug';
 import { IListItem } from '../models/IListItem';
 import { ISpService, IListIdentifier } from './ISpService';
+import { startOfTodayIso } from './dateUtils';
 
 export class PnPSpService implements ISpService {
   constructor(private sp: SPFI) {}
 
+  private static readonly SELECT_FIELDS: string[] = [
+    'Id',
+    'Title',
+    'Session',
+    'SessionDate',
+    'SessionType',
+    'EventSite',
+    'SessionLink',
+    'Speaker/Id',
+    'Speaker/Title',
+    'Speaker/EMail'
+  ];
+
+  private static readonly EXPAND_FIELDS: string[] = ['Speaker'];
+
   public async getItems(list: IListIdentifier): Promise<IListItem[]> {
     Logger.write(`[DataDemo] PnPSpService.getItems: list=${list.title}`, LogLevel.Info);
+    const todayIso = startOfTodayIso();
     const result = await this.sp.web.lists
       .getByTitle(list.title)
       .items
-      .select('Id', 'Title')() as IListItem[];
+      .select(...PnPSpService.SELECT_FIELDS)
+      .expand(...PnPSpService.EXPAND_FIELDS)
+      .filter(`SessionDate ge datetime'${todayIso}'`)
+      .orderBy('SessionDate', true)() as IListItem[];
     logDebug('PnPSpService.getItems result:', result);
     return result;
   }
@@ -29,7 +49,8 @@ export class PnPSpService implements ISpService {
       .getByTitle(list.title)
       .items
       .getById(itemId)
-      .select('Id', 'Title')() as IListItem;
+      .select(...PnPSpService.SELECT_FIELDS)
+      .expand(...PnPSpService.EXPAND_FIELDS)() as IListItem;
     logDebug('PnPSpService.getItem result:', result);
     return result;
   }
