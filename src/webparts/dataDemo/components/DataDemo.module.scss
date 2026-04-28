@@ -13,6 +13,11 @@
     display: flex;
     justify-content: center;
 
+    :global(.ms-Pivot-link) {
+      height: 22px;
+      line-height: 22px;
+    }
+
     :global(.ms-Pivot-link.is-selected) {
       background-color: "[theme:themeLighterAlt, default: #faf4f1]";
       background-color: var(--themeLighterAlt, #faf4f1);

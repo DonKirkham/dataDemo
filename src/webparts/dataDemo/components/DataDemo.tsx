@@ -221,8 +221,8 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
       {
         key: 'actions',
         name: 'Actions',
-        minWidth: 80,
-        maxWidth: 100,
+        minWidth: 60,
+        maxWidth: 70,
         onRender: (item: IListItem) => (
           <Stack horizontal tokens={{ childrenGap: 4 }}>
             <IconButton
@@ -242,25 +242,26 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
           </Stack>
         )
       },
-      { key: 'Title', name: 'Event', fieldName: 'Title', minWidth: 140, maxWidth: 280, isResizable: true },
-      { key: 'Session', name: 'Session', fieldName: 'Session', minWidth: 160, maxWidth: 320, isResizable: true },
       {
         key: 'SessionDate',
         name: 'Date',
         fieldName: 'SessionDate',
-        minWidth: 90,
-        maxWidth: 120,
+        minWidth: 70,
+        maxWidth: 80,
         isResizable: true,
         onRender: (item: IListItem) =>
           item.SessionDate ? new Date(item.SessionDate).toLocaleDateString() : ''
       },
-      { key: 'SessionType', name: 'Type', fieldName: 'SessionType', minWidth: 120, maxWidth: 180, isResizable: true },
+      { key: 'Title', name: 'Event', fieldName: 'Title', minWidth: 180, maxWidth: 360, isResizable: true, isMultiline: true },
+      { key: 'Session', name: 'Session', fieldName: 'Session', minWidth: 200, maxWidth: 400, isResizable: true, isMultiline: true },
+      { key: 'SessionType', name: 'Type', fieldName: 'SessionType', minWidth: 90, maxWidth: 130, isResizable: true, isMultiline: true },
       {
         key: 'Speaker',
         name: 'Speaker',
-        minWidth: 140,
-        maxWidth: 240,
+        minWidth: 100,
+        maxWidth: 160,
         isResizable: true,
+        isMultiline: true,
         onRender: (item: IListItem) =>
           item.Speaker?.map((s) => s.Title).join(', ') ?? ''
       },
