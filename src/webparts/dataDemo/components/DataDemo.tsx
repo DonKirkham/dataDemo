@@ -8,6 +8,7 @@ import { IListItem } from '../models/IListItem';
 import { ISpService } from '../services/ISpService';
 import { Transport, Endpoint } from '../services/SpServiceFactory';
 import JokePanel from './JokePanel';
+import GraphExplorer from './GraphExplorer';
 import { Logger, LogLevel } from '@pnp/logging';
 import { logDebug } from '../services/logDebug';
 import {
@@ -35,6 +36,7 @@ import {
 const stackTokens: IStackTokens = { childrenGap: 10 };
 
 const PLACEHOLDER_ENDPOINTS: Endpoint[] = ['Simple Auth', 'Entra App'];
+const NON_SERVICE_ENDPOINTS: Endpoint[] = ['MS Graph'];
 
 const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   const [items, setItems] = React.useState<IListItem[]>([]);
@@ -118,6 +120,10 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
       setService(undefined);
       return newTransport;
     });
+    // The free-form Graph endpoint is REST-only; fall back to SharePoint if hidden.
+    if (newTransport === 'PnPjs') {
+      setEndpoint((prev) => (prev === 'MS Graph' ? 'SharePoint' : prev));
+    }
   }, []);
 
   const onEndpointChanged = React.useCallback((item?: PivotItem): void => {
@@ -135,6 +141,10 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   React.useEffect(() => {
     if (PLACEHOLDER_ENDPOINTS.indexOf(endpoint) >= 0) {
       Logger.write(`[DataDemo] endpoint ${endpoint} is a placeholder, skipping service init`, LogLevel.Verbose);
+      return;
+    }
+    if (NON_SERVICE_ENDPOINTS.indexOf(endpoint) >= 0) {
+      Logger.write(`[DataDemo] endpoint ${endpoint} does not use the SP service factory, skipping service init`, LogLevel.Verbose);
       return;
     }
     initServiceAndLoad(transport, endpoint, factory, site, list)
@@ -377,7 +387,8 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
             data-automation-id="dataDemo-pivot-endpoint"
           >
             <PivotItem headerText="SharePoint" itemKey="SharePoint" />
-            <PivotItem headerText="MS Graph" itemKey="MS Graph" />
+            {transport === 'REST' && <PivotItem headerText="MS Graph" itemKey="MS Graph" />}
+            <PivotItem headerText="MS Graph (SP)" itemKey="MS Graph (SP)" />
             <PivotItem headerText="Anonymous" itemKey="Anonymous" />
             <PivotItem headerText="Simple Auth" itemKey="Simple Auth" />
             <PivotItem headerText="Entra App" itemKey="Entra App" />
@@ -386,9 +397,11 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
 
         {PLACEHOLDER_ENDPOINTS.indexOf(endpoint) >= 0
           ? renderPlaceholder()
-          : isAnonymous && service
-            ? <JokePanel service={service} />
-            : renderCrudPanel()
+          : endpoint === 'MS Graph' && factory
+            ? <GraphExplorer factory={factory} />
+            : isAnonymous && service
+              ? <JokePanel service={service} />
+              : renderCrudPanel()
         }
       </Stack>
     </div>

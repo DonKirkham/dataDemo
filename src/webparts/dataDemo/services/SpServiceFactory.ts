@@ -2,6 +2,7 @@
 // ABOUTME: Handles PnP JS initialization (spfi/graphfi) and Graph client setup for each service type.
 
 import { WebPartContext } from '@microsoft/sp-webpart-base';
+import { MSGraphClientV3 } from '@microsoft/sp-http';
 import { spfi, SPFx as spSPFx } from '@pnp/sp';
 import { graphfi, SPFx as graphSPFx } from '@pnp/graph';
 import { Logger, LogLevel } from '@pnp/logging';
@@ -14,7 +15,7 @@ import { AnonymousRestService } from './AnonymousRestService';
 import { AnonymousPnPService } from './AnonymousPnPService';
 
 export type Transport = 'REST' | 'PnPjs';
-export type Endpoint = 'SharePoint' | 'MS Graph' | 'Anonymous' | 'Simple Auth' | 'Entra App';
+export type Endpoint = 'SharePoint' | 'MS Graph' | 'MS Graph (SP)' | 'Anonymous' | 'Simple Auth' | 'Entra App';
 
 export interface ISiteInfo {
   url: string;
@@ -32,7 +33,7 @@ export class SpServiceFactory {
       return new RestSpService(this.context.spHttpClient, site.url);
     }
 
-    if (transport === 'REST' && endpoint === 'MS Graph') {
+    if (transport === 'REST' && endpoint === 'MS Graph (SP)') {
       Logger.write('[DataDemo] SpServiceFactory: building GraphSpService', LogLevel.Verbose);
       const graphClient = await this.context.msGraphClientFactory.getClient('3');
       return new GraphSpService(graphClient, site.id);
@@ -45,7 +46,7 @@ export class SpServiceFactory {
       return new PnPSpService(sp);
     }
 
-    if (transport === 'PnPjs' && endpoint === 'MS Graph') {
+    if (transport === 'PnPjs' && endpoint === 'MS Graph (SP)') {
       Logger.write('[DataDemo] SpServiceFactory: building PnPGraphService', LogLevel.Verbose);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const graph = graphfi().using(graphSPFx(this.context as any));
@@ -64,5 +65,9 @@ export class SpServiceFactory {
 
     Logger.write(`[DataDemo] SpServiceFactory: unsupported combination ${transport} + ${endpoint}`, LogLevel.Error);
     throw new Error(`Unsupported combination: ${transport} + ${endpoint}`);
+  }
+
+  public async createGraphClient(): Promise<MSGraphClientV3> {
+    return this.context.msGraphClientFactory.getClient('3');
   }
 }
