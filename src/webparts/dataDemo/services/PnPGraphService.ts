@@ -104,9 +104,22 @@ export class PnPGraphService implements ISpService {
     return result;
   }
 
+  private toWriteFields(item: IListItem): Record<string, unknown> {
+    const fields: Record<string, unknown> = { Title: item.Title };
+    if (item.Session !== undefined) fields.Session = item.Session;
+    if (item.SessionDate !== undefined) fields.SessionDate = item.SessionDate;
+    if (item.SessionType !== undefined) fields.SessionType = item.SessionType;
+    if (item.EventSite !== undefined) {
+      fields.EventSite = item.EventSite?.Url
+        ? { Url: item.EventSite.Url, Description: item.EventSite.Description ?? item.EventSite.Url }
+        : null;
+    }
+    // Speaker is intentionally not written via Graph — Person field writes require lookup-id wrappers.
+    return fields;
+  }
+
   public async createItem(list: IListIdentifier, item: IListItem): Promise<IListItem> {
     Logger.write(`[DataDemo] PnPGraphService.createItem: list=${list.id}`, LogLevel.Info);
-    // Graph API expects fields nested inside the request body.
     // FieldValueSet is typed as empty in MS Graph types, so we cast.
     const result = await this.graph.sites
       .getById(this.siteId)
@@ -114,11 +127,11 @@ export class PnPGraphService implements ISpService {
       .getById(list.id)
       .items
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .add({ fields: { Title: item.Title } } as any);
+      .add({ fields: this.toWriteFields(item) } as any);
 
     const created = {
-      Id: parseInt(result.id, 10),
-      Title: item.Title
+      ...item,
+      Id: parseInt(result.id, 10)
     };
     logDebug('PnPGraphService.createItem result:', created);
     return created;
@@ -133,7 +146,7 @@ export class PnPGraphService implements ISpService {
       .items
       .getById(itemId.toString())
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .update({ fields: { Title: item.Title } } as any);
+      .update({ fields: this.toWriteFields(item) } as any);
 
     const result = { ...item, Id: itemId };
     logDebug('PnPGraphService.updateItem result:', result);

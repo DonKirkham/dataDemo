@@ -64,13 +64,27 @@ export class RestSpService implements ISpService {
     return result;
   }
 
+  private toWritePayload(item: IListItem): Record<string, unknown> {
+    const payload: Record<string, unknown> = { Title: item.Title };
+    if (item.Session !== undefined) payload.Session = item.Session;
+    if (item.SessionDate !== undefined) payload.SessionDate = item.SessionDate;
+    if (item.SessionType !== undefined) payload.SessionType = item.SessionType;
+    if (item.EventSite !== undefined) {
+      payload.EventSite = item.EventSite?.Url
+        ? { Url: item.EventSite.Url, Description: item.EventSite.Description ?? item.EventSite.Url }
+        : null;
+    }
+    if (item.Speaker !== undefined) {
+      payload.SpeakerId = item.Speaker.map((s) => s.Id).filter((id) => id > 0);
+    }
+    return payload;
+  }
+
   public async createItem(list: IListIdentifier, item: IListItem): Promise<IListItem> {
     Logger.write(`[DataDemo] RestSpService.createItem: list=${list.title}`, LogLevel.Info);
     const url = `${this.siteUrl}/_api/web/lists/getbytitle('${list.title}')/items`;
     const options: ISPHttpClientOptions = {
-      body: JSON.stringify({
-        Title: item.Title
-      })
+      body: JSON.stringify(this.toWritePayload(item))
     };
 
     const response: SPHttpClientResponse = await this.spHttpClient.post(
@@ -96,9 +110,7 @@ export class RestSpService implements ISpService {
         'IF-MATCH': '*',
         'X-HTTP-Method': 'MERGE'
       },
-      body: JSON.stringify({
-        Title: item.Title
-      })
+      body: JSON.stringify(this.toWritePayload(item))
     };
 
     const response: SPHttpClientResponse = await this.spHttpClient.post(

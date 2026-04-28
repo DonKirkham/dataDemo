@@ -97,16 +97,26 @@ export class GraphSpService implements ISpService {
     return result;
   }
 
+  private toWriteFields(item: IListItem): Record<string, unknown> {
+    const fields: Record<string, unknown> = { Title: item.Title };
+    if (item.Session !== undefined) fields.Session = item.Session;
+    if (item.SessionDate !== undefined) fields.SessionDate = item.SessionDate;
+    if (item.SessionType !== undefined) fields.SessionType = item.SessionType;
+    if (item.EventSite !== undefined) {
+      fields.EventSite = item.EventSite?.Url
+        ? { Url: item.EventSite.Url, Description: item.EventSite.Description ?? item.EventSite.Url }
+        : null;
+    }
+    // Speaker is intentionally not written via Graph — Person field writes require lookup-id wrappers.
+    return fields;
+  }
+
   public async createItem(list: IListIdentifier, item: IListItem): Promise<IListItem> {
     Logger.write(`[DataDemo] GraphSpService.createItem: list=${list.id}`, LogLevel.Info);
     const response = await this.graphClient
       .api(`/sites/${this.siteId}/lists/${list.id}/items`)
       .version('v1.0')
-      .post({
-        fields: {
-          Title: item.Title
-        }
-      });
+      .post({ fields: this.toWriteFields(item) });
 
     const result = this.toListItem(response as IGraphListItem);
     logDebug('GraphSpService.createItem result:', result);
@@ -118,9 +128,7 @@ export class GraphSpService implements ISpService {
     await this.graphClient
       .api(`/sites/${this.siteId}/lists/${list.id}/items/${itemId}/fields`)
       .version('v1.0')
-      .patch({
-        Title: item.Title
-      });
+      .patch(this.toWriteFields(item));
 
     const result = { ...item, Id: itemId };
     logDebug('GraphSpService.updateItem result:', result);

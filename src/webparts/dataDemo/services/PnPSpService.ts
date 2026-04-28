@@ -55,14 +55,28 @@ export class PnPSpService implements ISpService {
     return result;
   }
 
+  private toWritePayload(item: IListItem): Record<string, unknown> {
+    const payload: Record<string, unknown> = { Title: item.Title };
+    if (item.Session !== undefined) payload.Session = item.Session;
+    if (item.SessionDate !== undefined) payload.SessionDate = item.SessionDate;
+    if (item.SessionType !== undefined) payload.SessionType = item.SessionType;
+    if (item.EventSite !== undefined) {
+      payload.EventSite = item.EventSite?.Url
+        ? { Url: item.EventSite.Url, Description: item.EventSite.Description ?? item.EventSite.Url }
+        : null;
+    }
+    if (item.Speaker !== undefined) {
+      payload.SpeakerId = item.Speaker.map((s) => s.Id).filter((id) => id > 0);
+    }
+    return payload;
+  }
+
   public async createItem(list: IListIdentifier, item: IListItem): Promise<IListItem> {
     Logger.write(`[DataDemo] PnPSpService.createItem: list=${list.title}`, LogLevel.Info);
     const result = await this.sp.web.lists
       .getByTitle(list.title)
       .items
-      .add({
-        Title: item.Title
-      });
+      .add(this.toWritePayload(item));
 
     logDebug('PnPSpService.createItem result:', result.data);
     return result.data as IListItem;
@@ -74,9 +88,7 @@ export class PnPSpService implements ISpService {
       .getByTitle(list.title)
       .items
       .getById(itemId)
-      .update({
-        Title: item.Title
-      });
+      .update(this.toWritePayload(item));
 
     const result = { ...item, Id: itemId };
     logDebug('PnPSpService.updateItem result:', result);
