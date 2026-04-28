@@ -21,6 +21,14 @@
   }
 }
 
+.viewHeading {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: "[theme:themePrimary, default: #0078d4]";
+  color: var(--themePrimary, #0078d4);
+}
+
 .placeholder {
   padding: 40px 20px;
   text-align: center;

@@ -218,8 +218,6 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
     }
 
     const columns: IColumn[] = [
-      { key: 'Id', name: 'ID', fieldName: 'Id', minWidth: 40, maxWidth: 60, isResizable: true },
-      { key: 'Title', name: 'Title', fieldName: 'Title', minWidth: 100, maxWidth: 300, isResizable: true },
       {
         key: 'actions',
         name: 'Actions',
@@ -243,6 +241,41 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
             />
           </Stack>
         )
+      },
+      { key: 'Title', name: 'Event', fieldName: 'Title', minWidth: 140, maxWidth: 280, isResizable: true },
+      { key: 'Session', name: 'Session', fieldName: 'Session', minWidth: 160, maxWidth: 320, isResizable: true },
+      {
+        key: 'SessionDate',
+        name: 'Date',
+        fieldName: 'SessionDate',
+        minWidth: 90,
+        maxWidth: 120,
+        isResizable: true,
+        onRender: (item: IListItem) =>
+          item.SessionDate ? new Date(item.SessionDate).toLocaleDateString() : ''
+      },
+      { key: 'SessionType', name: 'Type', fieldName: 'SessionType', minWidth: 120, maxWidth: 180, isResizable: true },
+      {
+        key: 'Speaker',
+        name: 'Speaker',
+        minWidth: 140,
+        maxWidth: 240,
+        isResizable: true,
+        onRender: (item: IListItem) =>
+          item.Speaker?.map((s) => s.Title).join(', ') ?? ''
+      },
+      {
+        key: 'EventSite',
+        name: 'Event Site',
+        minWidth: 140,
+        maxWidth: 240,
+        isResizable: true,
+        onRender: (item: IListItem) =>
+          item.EventSite?.Url ? (
+            <a href={item.EventSite.Url} target="_blank" rel="noreferrer">
+              {item.EventSite.Description || item.EventSite.Url}
+            </a>
+          ) : null
       }
     ];
 
@@ -257,6 +290,8 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
             {error}
           </MessageBar>
         )}
+
+        <h2 className={styles.viewHeading} data-automation-id="dataDemo-heading-view">Upcoming Events</h2>
 
         <Stack horizontal tokens={stackTokens}>
           <PrimaryButton
