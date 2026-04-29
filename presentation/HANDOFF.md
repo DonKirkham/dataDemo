@@ -1,0 +1,108 @@
+# Presentation Handoff Note
+
+This file exists so a fresh Claude Code session (or a future you, on a different machine) can pick up the presentation work without losing the *why* behind the structure.
+
+If you're a new Claude reading this: read [slides.md](slides.md) and [demo-scripts.md](demo-scripts.md) first, then this file. The deliverables explain *what*; this file explains *what we decided and what's still open*.
+
+---
+
+## What this presentation is
+
+A 60-minute professional talk Don is preparing to give. Target split: roughly 60/40 slides/demos (the current draft is closer to 45/55 — we deliberately leaned demo-heavy because the comparison **is** the lesson).
+
+**Audience:** SPFx developers. Mix of people already shipping and people evaluating PnPjs.
+
+**Topic:** Data access from SPFx. The web part in this repo (`src/webparts/dataDemo`) is a comparison harness — the same CRUD operations against a "Speaking Events" SharePoint list, implemented six ways:
+
+| Transport | Endpoint | File |
+|---|---|---|
+| SPFx-native | SP REST | `SpfxSpService.ts` |
+| SPFx-native | MS Graph (SP list) | `SpfxGraphSpService.ts` |
+| SPFx-native | MS Graph (free-form) | `SpfxGraphQueryService.ts` |
+| SPFx-native | Anonymous public API | `SpfxAnonymousService.ts` |
+| PnPjs | SP REST | `PnPjsSpService.ts` |
+| PnPjs | MS Graph (SP list) | `PnPjsGraphSpService.ts` |
+| PnPjs | Anonymous public API | `PnPjsAnonymousService.ts` |
+
+The two-tier Pivot UI in `DataDemo.tsx` is the demo surface — top tier picks transport, second tier picks endpoint.
+
+---
+
+## Why the two-pass structure
+
+This was Don's call and it's the right call. We considered three framings:
+
+- **A — Six Ways to Skin a List** (feature tour, pivot-driven)
+- **B — From Raw HTTP to PnPjs: A Refactoring Story** (evolution narrative)
+- **C — Field Guide to SharePoint Data Access** (decision-focused)
+
+Don picked a fourth: **two passes over the same problem space.** Pass 1 teaches SPFx-native (REST → Graph → anonymous). Pivot slide says "notice what's missing." Pass 2 re-does the same operations with PnPjs and lights up the missing columns (logging, caching, batching).
+
+**Why this beats Option A:** A side-by-side feature tour invites "PnPjs is better, here's why" framing, which sounds like a sales pitch. The two-pass structure earns the conclusion — the audience does the comparing themselves. Pass 1 has to be honest (no strawmanning the SPFx APIs) for Pass 2 to land.
+
+**The keystone slide is #11 (the pivot)** and **the keystone demo is #4 (the URL reveal).** If anything in the talk has to survive a time crunch, it's those two. Slide 11 is a five-column missing-features table. Demo 4 shows that PnPjs and SPFx-native produce the *exact same network request* — the audience needs to leave that demo trusting that PnPjs isn't magic, just a URL builder.
+
+---
+
+## Decisions already made
+
+1. **Graph Explorer demo lives in Pass 1**, not Pass 2 (Don's call). It's the SPFx `MSGraphClientV3` exposed as a sandbox, so it belongs with the SPFx-native pass. It's also useful as emotional fuel — the audience sees raw Graph JSON and starts feeling the "I'm parsing this by hand" pain before the pivot.
+2. **Batching demo will be simulated**, not real (Don doesn't have a big enough list). Specifically: pre-stage a "Bulk Add 5" button, show 5 separate POSTs in SPFx-native vs 1 `$batch` POST in PnPjs. "5 → 1" is more dramatic than "1 → many." See `demo-scripts.md` Demo 7c for the wiring.
+3. **Honest framing throughout**, not PnPjs evangelism. Slide 16 says explicitly that Graph awkwardness is a Graph problem (not a PnPjs problem). Slide 22 lists when *not* to use PnPjs (bundle size, one-off calls, debugging at the wire).
+4. **Demo time > slide time.** We accepted 45/55 instead of 60/40 because the demos *are* the argument. If timing pressure forces cuts, see the "Timing reminders" section at the end of `demo-scripts.md`.
+
+---
+
+## Open items (work still to do)
+
+These are the things Don needs to address before the talk. Order matters:
+
+1. **Build the "Bulk Add 5" button.** ~30–60 min of real code work. The batching demo (7c) doesn't function without it. Pre-stage on a feature branch so you check it out only for that demo segment. Wire it to a `createMany(items)` method on `PnPjsSpService` that uses `sp.batched()` (sketched in `slides.md` slide 18 and `demo-scripts.md` Demo 7c).
+2. **Verify the bundle-size claim** on slide 22 ("PnPjs adds ~50–80 KB"). That number is approximate, not measured. Run `heft package-solution --production` against a build with and without PnPjs and check actual deltas. If the number is way off, update the slide.
+3. **Decide the format for slide 11 (the pivot).** Current draft is a five-column missing-features table. Alternative discussed: a screenshot of SPFx Graph code with five colored highlights, each labeled with what's missing. The screenshot version has more visual punch but takes longer to produce. Either works.
+4. **Pre-talk setup checklist** (top of `demo-scripts.md`) — the Speaking Events list needs ~10 seeded items with a mix of past/future dates, and at least one disposable test item.
+5. **Backup screen recordings** for each demo. Tenant network is unpredictable.
+6. **Pre-stage logging/caching/batching code** for Demo 7. Live editing fluent chains under presentation pressure is asking for trouble. Either branch the changes in or comment them in/out as needed.
+
+---
+
+## Things I considered and rejected
+
+- **Recording each demo and embedding video instead of going live.** Lower risk, but kills the room energy. Live caching demo (instant second click in the network tab) is the visceral moment of the talk. Don't pre-record it.
+- **Adding a section on PnPjs v3 → v4 migration.** Out of scope for this audience and would balloon runtime. Mention in passing during Q&A if asked (the batching API rewrite is the headline).
+- **Adding an MGT or Fluent UI angle.** Same — out of scope. This is a *data access* talk, not a UI talk.
+- **A demo of `@pnp/queryable` against a non-SP API** (PnPjs version of the joke service). Slide 17 covers it conceptually. A demo would be redundant after Demo 3 unless we want to show the X-PnPjs-RequestId / CORS preflight gotcha — and that's too rabbit-holey for the runtime.
+
+---
+
+## Don's preferences relevant to this work
+
+(Cross-referenced with `~/.claude/CLAUDE.md` — for the new session's benefit.)
+
+- **No sycophancy.** Direct technical opinions, push back when warranted.
+- **Address Don as "Don".**
+- **Honest pacing.** If Pass 1 isn't honest (e.g., strawmanning SPFx APIs), the talk fails. Don explicitly framed the structure as "teaching the SPFx way first, then going back."
+- **Commit hygiene** — atomic commits, no AI references in messages. The presentation work is in `b11d64f` (docs) and `674487f` (refactor), both pushed to `origin/main`.
+
+---
+
+## State of the repo as of this handoff
+
+- Branch: `main`
+- Last commit: `674487f refactor: rename SpServiceFactory to ServiceFactory`
+- Previous commit: `b11d64f docs: add 60-minute presentation outline and demo scripts`
+- Remote: `https://github.com/DonKirkham/DataDemo`
+- All work pushed. No uncommitted changes pending the handoff write itself.
+
+The web part code is the *artifact* of the talk. The presentation files in this folder are the *plan* for the talk. Both are needed.
+
+---
+
+## How to resume on a new machine
+
+1. `git clone https://github.com/DonKirkham/DataDemo`
+2. `pnpm install`
+3. `heft start` — confirm web part loads in workbench against your tenant
+4. Re-read [slides.md](slides.md) and [demo-scripts.md](demo-scripts.md)
+5. Pick up from "Open items" above
+6. If continuing with a fresh Claude session: paste this file in or let it find the file on disk. The slides and demo scripts are self-contained enough that no transcript replay is needed.
