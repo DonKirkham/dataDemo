@@ -2,10 +2,10 @@
 // ABOUTME: Receives the service factory, site info, and list identifier from the web part.
 
 import { IListIdentifier } from '../models/ISpService';
-import { SpServiceFactory, ISiteInfo } from '../services/SpServiceFactory';
+import { ServiceFactory, ISiteInfo } from '../services/ServiceFactory';
 
 export interface IDataDemoProps {
-  factory: SpServiceFactory | undefined;
+  factory: ServiceFactory | undefined;
   site: ISiteInfo;
   list: IListIdentifier;
 }

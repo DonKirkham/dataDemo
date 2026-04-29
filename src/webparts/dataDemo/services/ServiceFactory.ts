@@ -23,7 +23,7 @@ export interface ISiteInfo {
   id: string;
 }
 
-export class SpServiceFactory {
+export class ServiceFactory {
   constructor(private _context: WebPartContext) {}
 
   public get context(): WebPartContext {

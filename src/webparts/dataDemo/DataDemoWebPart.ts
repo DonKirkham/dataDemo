@@ -23,7 +23,7 @@ import { Placeholder } from '@pnp/spfx-controls-react';
 
 import DataDemo from './components/DataDemo';
 import { IDataDemoProps } from './components/IDataDemoProps';
-import { SpServiceFactory } from './services/SpServiceFactory';
+import { ServiceFactory } from './services/ServiceFactory';
 import { IListIdentifier } from './models/ISpService';
 
 export interface IStoredList {
@@ -40,7 +40,7 @@ export interface IDataDemoWebPartProps {
 
 export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebPartProps> {
 
-  private _factory: SpServiceFactory | undefined;
+  private _factory: ServiceFactory | undefined;
 
   public render(): void {
     const list = this.properties.list;
@@ -97,7 +97,7 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
       }];
     }
 
-    this._factory = new SpServiceFactory(this.context);
+    this._factory = new ServiceFactory(this.context);
     Logger.write('[DataDemo] onInit: web part initialized, service factory ready', LogLevel.Info);
     return Promise.resolve();
   }

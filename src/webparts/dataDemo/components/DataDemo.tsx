@@ -8,7 +8,7 @@ import { IEventItem, ISpeaker, SessionType } from '../models/IEventItem';
 import { ISpService } from '../models/ISpService';
 import { IJokeService } from '../models/IJokeService';
 import { IGraphQueryService } from '../models/IGraphQueryService';
-import { Transport, Endpoint } from '../services/SpServiceFactory';
+import { Transport, Endpoint } from '../services/ServiceFactory';
 import JokePanel from './JokePanel';
 import GraphExplorer from './GraphExplorer';
 import { Logger, LogLevel } from '@pnp/logging';
