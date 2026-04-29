@@ -4,6 +4,7 @@
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { spfi, SPFx as spSPFx } from '@pnp/sp';
 import { graphfi, SPFx as graphSPFx } from '@pnp/graph';
+import { Caching } from '@pnp/queryable';
 import { ISpService } from '../models/ISpService';
 import { IJokeService } from '../models/IJokeService';
 import { IGraphQueryService } from '../models/IGraphQueryService';
@@ -41,8 +42,10 @@ export class ServiceFactory {
     }
 
     if (transport === 'PnPjs' && endpoint === 'SharePoint') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sp = spfi(site.url).using(spSPFx(this.context as any));
+      const sp = spfi(site.url)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .using(spSPFx(this.context as any))
+        //.using(Caching({ store: 'session' })); // comment out to disable caching
       return new PnPjsSpService(sp);
     }
 
