@@ -493,9 +493,9 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
             data-automation-id="dataDemo-pivot-endpoint"
           >
             <PivotItem headerText="SharePoint" itemKey="SharePoint" />
-            {transport === 'SPFx' && <PivotItem headerText="MS Graph" itemKey="MS Graph" />}
             <PivotItem headerText="MS Graph (SP)" itemKey="MS Graph (SP)" />
             <PivotItem headerText="Anonymous" itemKey="Anonymous" />
+            {transport === 'SPFx' && <PivotItem headerText="MS Graph" itemKey="MS Graph (Explorer)" />}
             <PivotItem headerText="Simple Auth" itemKey="Simple Auth" />
             <PivotItem headerText="Entra App" itemKey="Entra App" />
           </Pivot>

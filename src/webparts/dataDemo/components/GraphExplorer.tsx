@@ -50,13 +50,6 @@ const GraphExplorer: React.FC<IGraphExplorerProps> = ({ service }) => {
     setPath(val ?? '');
   }, []);
 
-  const onPathKeyDown = React.useCallback((e: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter' && !loading && path) {
-      e.preventDefault();
-      void onRun();
-    }
-  }, [loading, path]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const onRun = React.useCallback(async (): Promise<void> => {
     if (!path) return;
 
@@ -85,6 +78,13 @@ const GraphExplorer: React.FC<IGraphExplorerProps> = ({ service }) => {
       setLoading(false);
     }
   }, [service, path]);
+
+  const onPathKeyDown = React.useCallback((e: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'Enter' && !loading && path) {
+      e.preventDefault();
+      onRun().catch(() => undefined);
+    }
+  }, [loading, path, onRun]);
 
   return (
     <Stack tokens={stackTokens} data-automation-id="dataDemo-container-graphExplorer">
