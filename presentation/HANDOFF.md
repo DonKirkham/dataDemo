@@ -2,7 +2,7 @@
 
 This file exists so a fresh Claude Code session (or a future you, on a different machine) can pick up the presentation work without losing the *why* behind the structure.
 
-If you're a new Claude reading this: read [slides.md](slides.md) and [demo-scripts.md](demo-scripts.md) first, then this file. The deliverables explain *what*; this file explains *what we decided and what's still open*.
+If you're a new Claude reading this: read [slides.md](slides.md) and [demo-scripts.md](demo-scripts.md) first, then this file. The deliverables explain *what*; this file explains *what we decided and what's still open*. [slot-50min.md](slot-50min.md) describes the cut plan if the talk lands in a 50-minute slot rather than the canonical 60.
 
 ---
 
