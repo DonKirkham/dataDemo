@@ -53,6 +53,33 @@ const stackTokens: IStackTokens = { childrenGap: 10 };
 
 const PLACEHOLDER_ENDPOINTS: Endpoint[] = ['Simple Auth', 'Entra App'];
 
+const QUERY_PARAM_TRANSPORT = 'transport';
+const QUERY_PARAM_ENDPOINT = 'endpoint';
+
+const TRANSPORT_SLUG: Record<Transport, string> = {
+  'SPFx': 'spfx',
+  'PnPjs': 'pnpjs'
+};
+const ENDPOINT_SLUG: Record<Endpoint, string> = {
+  'SharePoint': 'sharepoint',
+  'MS Graph (SP)': 'graphsp',
+  'Anonymous': 'anonymous',
+  'MS Graph (Explorer)': 'graphexplorer',
+  'Simple Auth': 'simpleauth',
+  'Entra App': 'entraapp'
+};
+
+const slugTo = <T extends string>(map: Record<T, string>, slug: string | undefined): T | undefined =>
+  slug ? (Object.keys(map) as T[]).find((k) => map[k] === slug) : undefined;
+
+const readDemoQueryParams = (): { transport?: Transport; endpoint?: Endpoint } => {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    transport: slugTo(TRANSPORT_SLUG, params.get(QUERY_PARAM_TRANSPORT) ?? undefined),
+    endpoint: slugTo(ENDPOINT_SLUG, params.get(QUERY_PARAM_ENDPOINT) ?? undefined)
+  };
+};
+
 const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   const [items, setItems] = React.useState<IEventItem[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -60,8 +87,14 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   const [showDialog, setShowDialog] = React.useState(false);
   const [editItem, setEditItem] = React.useState<IEventItem>({ Title: '' });
   const [isEditing, setIsEditing] = React.useState(false);
-  const [transport, setTransport] = React.useState<Transport>('SPFx');
-  const [endpoint, setEndpoint] = React.useState<Endpoint>('SharePoint');
+  const [transport, setTransport] = React.useState<Transport>(() => readDemoQueryParams().transport ?? 'SPFx');
+  const [endpoint, setEndpoint] = React.useState<Endpoint>(() => {
+    const q = readDemoQueryParams();
+    const t = q.transport ?? 'SPFx';
+    const e = q.endpoint ?? 'SharePoint';
+    // The free-form Graph endpoint is SPFx-only; fall back if the URL combo is invalid.
+    return e === 'MS Graph (Explorer)' && t !== 'SPFx' ? 'SharePoint' : e;
+  });
   const [spService, setSpService] = React.useState<ISpService | undefined>(undefined);
   const [jokeService, setJokeService] = React.useState<IJokeService | undefined>(undefined);
   const [graphQueryService, setGraphQueryService] = React.useState<IGraphQueryService | undefined>(undefined);
@@ -89,7 +122,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
     t: Transport, ep: Endpoint, f: typeof factory, s: typeof site, l: typeof list
   ): Promise<void> => {
     const anon = ep === 'Anonymous';
-    const graphQuery = ep === 'MS Graph';
+    const graphQuery = ep === 'MS Graph (Explorer)';
     const needsSite = !anon && !graphQuery;
 
     Logger.info(`initServiceAndLoad: transport=${t}, endpoint=${ep}`);
@@ -147,7 +180,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
     });
     // The free-form Graph endpoint is SPFx-only; fall back to SharePoint if hidden.
     if (newTransport === 'PnPjs') {
-      setEndpoint((prev) => (prev === 'MS Graph' ? 'SharePoint' : prev));
+      setEndpoint((prev) => (prev === 'MS Graph (Explorer)' ? 'SharePoint' : prev));
     }
   }, []);
 
@@ -163,6 +196,20 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
       return newEndpoint;
     });
   }, []);
+
+  // Reflect the active transport/endpoint in the URL so a browser refresh restores them.
+  React.useEffect(() => {
+    const tSlug = TRANSPORT_SLUG[transport];
+    const eSlug = ENDPOINT_SLUG[endpoint];
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(QUERY_PARAM_TRANSPORT) === tSlug && params.get(QUERY_PARAM_ENDPOINT) === eSlug) {
+      return;
+    }
+    params.set(QUERY_PARAM_TRANSPORT, tSlug);
+    params.set(QUERY_PARAM_ENDPOINT, eSlug);
+    const newUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+    window.history.replaceState(undefined, '', newUrl);
+  }, [transport, endpoint]);
 
   // Initialize on mount and re-initialize when inputs change
   React.useEffect(() => {
@@ -490,7 +537,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
 
         {PLACEHOLDER_ENDPOINTS.indexOf(endpoint) >= 0
           ? renderPlaceholder()
-          : endpoint === 'MS Graph' && graphQueryService
+          : endpoint === 'MS Graph (Explorer)' && graphQueryService
             ? <GraphExplorer service={graphQueryService} />
             : isAnonymous && jokeService
               ? <JokePanel service={jokeService} />

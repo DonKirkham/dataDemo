@@ -4,6 +4,7 @@
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { spfi, SPFx as spSPFx } from '@pnp/sp';
 import { graphfi, SPFx as graphSPFx } from '@pnp/graph';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Caching } from '@pnp/queryable';
 import { ISpService } from '../models/ISpService';
 import { IJokeService } from '../models/IJokeService';
@@ -17,7 +18,7 @@ import { PnPjsAnonymousService } from './PnPjsAnonymousService';
 import { SpfxGraphQueryService } from './SpfxGraphQueryService';
 
 export type Transport = 'SPFx' | 'PnPjs';
-export type Endpoint = 'SharePoint' | 'MS Graph' | 'MS Graph (SP)' | 'Anonymous' | 'Simple Auth' | 'Entra App';
+export type Endpoint = 'SharePoint' | 'MS Graph (Explorer)' | 'MS Graph (SP)' | 'Anonymous' | 'Simple Auth' | 'Entra App';
 
 export interface ISiteInfo {
   url: string;
