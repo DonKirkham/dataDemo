@@ -17,9 +17,9 @@ import {
   PropertyFieldListPickerOrderBy
 } from '@pnp/spfx-property-controls';
 
-import { Logger, LogLevel, ConsoleListener } from '@pnp/logging';
-
 import { Placeholder } from '@pnp/spfx-controls-react';
+
+import { Logger, LogLevel } from './utilities/logger';
 
 import DataDemo from './components/DataDemo';
 import { IDataDemoProps } from './components/IDataDemoProps';
@@ -46,12 +46,12 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
     const list = this.properties.list;
     const hasSite = this.properties.sites && this.properties.sites.length > 0;
 
-    Logger.write(`[DataDemo] render: hasSite=${hasSite}, list=${list?.title ?? 'none'}`, LogLevel.Verbose);
+    Logger.debug(`render: hasSite=${hasSite}, list=${list?.title ?? 'none'}`);
 
     ReactDom.unmountComponentAtNode(this.domElement);
 
     if (!hasSite || !list) {
-      Logger.write('[DataDemo] render: showing configuration placeholder', LogLevel.Info);
+      Logger.info('render: showing configuration placeholder');
       const element = React.createElement(Placeholder, {
         iconName: 'Edit',
         iconText: 'Configure Data Demo',
@@ -68,7 +68,7 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
     const siteId = site.id || this.context.pageContext.site.id.toString();
     const listIdentifier: IListIdentifier = { id: list.id, title: list.title };
 
-    Logger.write(`[DataDemo] render: mounting DataDemo component for site=${siteUrl}, list=${listIdentifier.title}`, LogLevel.Info);
+    Logger.info(`render: mounting DataDemo component for site=${siteUrl}, list=${listIdentifier.title}`);
 
     const element: React.ReactElement<IDataDemoProps> = React.createElement(
       DataDemo,
@@ -83,13 +83,13 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
   }
 
   protected onInit(): Promise<void> {
-    Logger.subscribe(ConsoleListener());
-    Logger.activeLogLevel = this.properties.enhancedLogging ? LogLevel.Verbose : LogLevel.Warning;
+    Logger.attachConsoleListener();
+    Logger.setLevel(this.properties.enhancedLogging ? LogLevel.Verbose : LogLevel.Warning);
 
-    Logger.write(`[DataDemo] onInit: starting (enhancedLogging=${this.properties.enhancedLogging ? 'on' : 'off'})`, LogLevel.Info);
+    Logger.info(`onInit: starting (enhancedLogging=${this.properties.enhancedLogging ? 'on' : 'off'})`);
 
     if (!this.properties.sites || this.properties.sites.length === 0) {
-      Logger.write(`[DataDemo] onInit: defaulting site to current web ${this.context.pageContext.web.absoluteUrl}`, LogLevel.Verbose);
+      Logger.debug(`onInit: defaulting site to current web ${this.context.pageContext.web.absoluteUrl}`);
       this.properties.sites = [{
         url: this.context.pageContext.web.absoluteUrl,
         title: this.context.pageContext.web.title,
@@ -98,7 +98,7 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
     }
 
     this._factory = new ServiceFactory(this.context);
-    Logger.write('[DataDemo] onInit: web part initialized, service factory ready', LogLevel.Info);
+    Logger.info('onInit: web part initialized, service factory ready');
     return Promise.resolve();
   }
 
@@ -119,7 +119,7 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
   }
 
   protected onDispose(): void {
-    Logger.write('[DataDemo] onDispose: unmounting web part', LogLevel.Info);
+    Logger.info('onDispose: unmounting web part');
     ReactDom.unmountComponentAtNode(this.domElement);
   }
 
@@ -206,17 +206,17 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
   protected onPropertyPaneFieldChanged(propertyPath: string, oldValue: unknown, newValue: unknown): void {
     super.onPropertyPaneFieldChanged(propertyPath, oldValue, newValue);
 
-    Logger.write(`[DataDemo] property pane changed: ${propertyPath}`, LogLevel.Verbose);
+    Logger.debug(`property pane changed: ${propertyPath}`);
 
     if (propertyPath === 'sites') {
-      Logger.write('[DataDemo] site changed, clearing selected list', LogLevel.Info);
+      Logger.info('site changed, clearing selected list');
       this.properties.list = undefined;
       this.context.propertyPane.refresh();
     }
 
     if (propertyPath === 'enhancedLogging') {
-      Logger.activeLogLevel = newValue ? LogLevel.Verbose : LogLevel.Warning;
-      Logger.write(`[DataDemo] enhanced logging ${newValue ? 'enabled' : 'disabled'}`, LogLevel.Info);
+      Logger.setLevel(newValue ? LogLevel.Verbose : LogLevel.Warning);
+      Logger.info(`enhanced logging ${newValue ? 'enabled' : 'disabled'}`);
     }
 
     // includeListTitleAndUrl returns an IPropertyFieldList object — store it directly

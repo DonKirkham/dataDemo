@@ -11,8 +11,7 @@ import { IGraphQueryService } from '../models/IGraphQueryService';
 import { Transport, Endpoint } from '../services/ServiceFactory';
 import JokePanel from './JokePanel';
 import GraphExplorer from './GraphExplorer';
-import { Logger, LogLevel } from '@pnp/logging';
-import { logDebug } from '../utilities/logDebug';
+import { Logger } from '../utilities/logger';
 import {
   DetailsList,
   DetailsListLayoutMode,
@@ -70,19 +69,17 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   const isAnonymous = endpoint === 'Anonymous';
 
   const loadItems = React.useCallback(async (svc: ISpService, lst: typeof list): Promise<void> => {
-    Logger.write(`[DataDemo] loadItems: requesting items from list ${lst?.title ?? '(none)'}`, LogLevel.Info);
+    Logger.info(`loadItems: requesting items from list ${lst?.title ?? '(none)'}`);
     setLoading(true);
     setError(undefined);
 
     try {
       const result = await svc.getItems(lst ?? { title: '', id: '' });
-      Logger.write(`[DataDemo] loadItems: received ${result.length} item(s)`, LogLevel.Verbose);
-      logDebug('loadItems result:', result);
+      Logger.debug(`loadItems: received ${result.length} item(s)`, result);
       setItems(result);
       setLoading(false);
     } catch (err) {
-      Logger.write(`[DataDemo] loadItems failed: ${(err as Error).message}`, LogLevel.Error);
-      Logger.error(err as Error);
+      Logger.error(`loadItems failed: ${(err as Error).message}`, err);
       setLoading(false);
       setError(`Failed to load items: ${(err as Error).message}`);
     }
@@ -95,10 +92,10 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
     const graphQuery = ep === 'MS Graph';
     const needsSite = !anon && !graphQuery;
 
-    Logger.write(`[DataDemo] initServiceAndLoad: transport=${t}, endpoint=${ep}`, LogLevel.Info);
+    Logger.info(`initServiceAndLoad: transport=${t}, endpoint=${ep}`);
 
     if (!f || (needsSite && (!s || !l))) {
-      Logger.write('[DataDemo] initServiceAndLoad: skipping (factory/site/list missing)', LogLevel.Verbose);
+      Logger.debug('initServiceAndLoad: skipping (factory/site/list missing)');
       setSpService(undefined);
       setJokeService(undefined);
       setGraphQueryService(undefined);
@@ -131,8 +128,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
         await loadItems(svc, l);
       }
     } catch (err) {
-      Logger.write(`[DataDemo] initServiceAndLoad failed: ${(err as Error).message}`, LogLevel.Error);
-      Logger.error(err as Error);
+      Logger.error(`initServiceAndLoad failed: ${(err as Error).message}`, err);
       setLoading(false);
       setError(`Failed to initialize service: ${(err as Error).message}`);
     }
@@ -143,7 +139,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
     const newTransport = item.props.itemKey as Transport;
     setTransport((prev) => {
       if (prev === newTransport) return prev;
-      Logger.write(`[DataDemo] transport changed: ${prev} -> ${newTransport}`, LogLevel.Info);
+      Logger.info(`transport changed: ${prev} -> ${newTransport}`);
       setSpService(undefined);
       setJokeService(undefined);
       setGraphQueryService(undefined);
@@ -160,7 +156,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
     const newEndpoint = item.props.itemKey as Endpoint;
     setEndpoint((prev) => {
       if (prev === newEndpoint) return prev;
-      Logger.write(`[DataDemo] endpoint changed: ${prev} -> ${newEndpoint}`, LogLevel.Info);
+      Logger.info(`endpoint changed: ${prev} -> ${newEndpoint}`);
       setSpService(undefined);
       setJokeService(undefined);
       setGraphQueryService(undefined);
@@ -171,10 +167,10 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   // Initialize on mount and re-initialize when inputs change
   React.useEffect(() => {
     if (PLACEHOLDER_ENDPOINTS.indexOf(endpoint) >= 0) {
-      Logger.write(`[DataDemo] endpoint ${endpoint} is a placeholder, skipping service init`, LogLevel.Verbose);
+      Logger.debug(`endpoint ${endpoint} is a placeholder, skipping service init`);
       return;
     }
-    Logger.write(`[DataDemo] init effect: site=${site?.id ?? 'none'}, list=${list?.id ?? 'none'}, transport=${transport}, endpoint=${endpoint}`, LogLevel.Verbose);
+    Logger.debug(`init effect: site=${site?.id ?? 'none'}, list=${list?.id ?? 'none'}, transport=${transport}, endpoint=${endpoint}`);
     initServiceAndLoad(transport, endpoint, factory, site, list)
       .catch(() => { /* handled internally */ });
   }, [factory, site?.id, list?.id, transport, endpoint]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -198,22 +194,21 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   const onSaveItem = React.useCallback(async (): Promise<void> => {
     if (!spService || !list) return;
 
-    Logger.write(`[DataDemo] onSaveItem: ${isEditing ? 'update' : 'create'} item${isEditing ? ` id=${editItem.Id}` : ''}`, LogLevel.Info);
+    Logger.info(`onSaveItem: ${isEditing ? 'update' : 'create'} item${isEditing ? ` id=${editItem.Id}` : ''}`);
     setShowDialog(false);
     setLoading(true);
 
     try {
       if (isEditing && editItem.Id) {
         const updated = await spService.updateItem(list, editItem.Id, editItem);
-        logDebug('onSaveItem update result:', updated);
+        Logger.debug('onSaveItem update result:', updated);
       } else {
         const created = await spService.createItem(list, editItem);
-        logDebug('onSaveItem create result:', created);
+        Logger.debug('onSaveItem create result:', created);
       }
       await loadItems(spService, list);
     } catch (err) {
-      Logger.write(`[DataDemo] onSaveItem failed: ${(err as Error).message}`, LogLevel.Error);
-      Logger.error(err as Error);
+      Logger.error(`onSaveItem failed: ${(err as Error).message}`, err);
       setLoading(false);
       setError(`Failed to save item: ${(err as Error).message}`);
     }
@@ -222,16 +217,15 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   const onDeleteItem = React.useCallback(async (id: number): Promise<void> => {
     if (!spService || !list) return;
 
-    Logger.write(`[DataDemo] onDeleteItem: deleting id=${id}`, LogLevel.Info);
+    Logger.info(`onDeleteItem: deleting id=${id}`);
     setLoading(true);
 
     try {
       await spService.deleteItem(list, id);
-      Logger.write(`[DataDemo] onDeleteItem: deleted id=${id}`, LogLevel.Verbose);
+      Logger.debug(`onDeleteItem: deleted id=${id}`);
       await loadItems(spService, list);
     } catch (err) {
-      Logger.write(`[DataDemo] onDeleteItem failed: ${(err as Error).message}`, LogLevel.Error);
-      Logger.error(err as Error);
+      Logger.error(`onDeleteItem failed: ${(err as Error).message}`, err);
       setLoading(false);
       setError(`Failed to delete item: ${(err as Error).message}`);
     }
