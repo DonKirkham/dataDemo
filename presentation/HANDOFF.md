@@ -55,14 +55,20 @@ Don picked a fourth: **two passes over the same problem space.** Pass 1 teaches 
 
 ## Open items (work still to do)
 
-These are the things Don needs to address before the talk. Order matters:
+**Code/demo-harness work is frozen as of 2026-04-30.** Slides and demo scripts may still be edited; service code, logger, and toggle wiring should not change unless a real bug surfaces during rehearsal.
 
-1. ~~**Build the "Bulk Add 5" button.**~~ **Superseded.** We pivoted away from bulk writes — the Speaking Events list isn't big enough for that story to land in the room. The batching demo is now a paginated *read* in `PnPjsSpService.getItems`: 100 calls of `top(5)/skip(N)` packed into one `sp.batched({ maxRequests: 100 })` envelope. The single-call vs batched paths are both in the file, gated by comment markers; the demo flips which block is active. Slide 21 and Demo 7c reflect this.
-2. **Verify the bundle-size claim** on slide 22 ("PnPjs adds ~50–80 KB"). That number is approximate, not measured. Run `heft package-solution --production` against a build with and without PnPjs and check actual deltas. If the number is way off, update the slide.
-3. **Decide the format for slide 11 (the pivot).** Current draft is a five-column missing-features table. Alternative discussed: a screenshot of SPFx Graph code with five colored highlights, each labeled with what's missing. The screenshot version has more visual punch but takes longer to produce. Either works.
-4. **Pre-talk setup checklist** (top of `demo-scripts.md`) — the Speaking Events list needs ~10 seeded items with a mix of past/future dates, and at least one disposable test item. The checklist now also asserts the Demo 7 baseline state (caching commented off, single-call read active, sessionStorage cleared).
-5. **Backup screen recordings** for each demo. Tenant network is unpredictable.
-6. ~~**Pre-stage logging/caching/batching code** for Demo 7.~~ **Done.** Caching is a one-line uncomment in `ServiceFactory.ts` (`.using(Caching({ store: 'session' }))`), with a `CacheNever()` per-call opt-out commented in `PnPjsSpService.getItems`. Batching is the comment-block swap described in item 1. No live editing of fluent chains during the talk.
+### Don's TODOs before the talk
+
+1. **Verify the bundle-size claim** on slide 22 ("PnPjs adds ~50–80 KB"). That number is approximate, not measured. Run `heft package-solution --production` against a build with and without PnPjs and check actual deltas. If the number is way off, update the slide.
+2. **Decide the format for slide 11 (the pivot).** Current draft is a five-column missing-features table. Alternative discussed: a screenshot of SPFx Graph code with five colored highlights, each labeled with what's missing. The screenshot version has more visual punch but takes longer to produce. Either works.
+3. **Seed the Speaking Events list** with ~10 items (mix of past/future dates) and at least one disposable test item. Pre-talk checklist at the top of `demo-scripts.md` has the full list.
+4. **Backup screen recordings** for each demo. Tenant network is unpredictable.
+5. **Rehearse the Demo 7 toggles** until the comment-block swap and the `Caching()` uncomment are muscle memory. The pre-talk checklist asserts the baseline state (caching commented off, single-call read active, sessionStorage cleared); confirm it 30 minutes before going on stage.
+
+### Done (kept here for traceability)
+
+- ~~**Build the "Bulk Add 5" button.**~~ Superseded. The batching demo became a paginated *read* in `PnPjsSpService.getItems`: 100 calls of `top(5)/skip(N)` packed into one `sp.batched({ maxRequests: 100 })` envelope. Single-call vs batched paths both live in the file, gated by comment markers; the demo flips which block is active. Slide 21 and Demo 7c reflect this.
+- ~~**Pre-stage logging/caching/batching code** for Demo 7.~~ Caching is a one-line uncomment in `ServiceFactory.ts` (`.using(Caching({ store: 'session' }))`), with a `CacheNever()` per-call opt-out commented in `PnPjsSpService.getItems`. Batching is the comment-block swap described above. Logging is wired through `utilities/logger.ts` and toggled via the **Enhanced logging** property-pane checkbox. No live editing of fluent chains during the talk.
 
 ---
 

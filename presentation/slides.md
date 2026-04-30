@@ -222,6 +222,7 @@ Look at what we wrote across three services:
 Speaker notes:
 - This is the turn. Pause here. Don't rush.
 - "We just wrote three services. Every one of them needs the same five things added before it's production-ready. We're going to write the same three services again with PnPjs, and you're going to watch all five columns light up."
+- **Disambiguation if asked / if visible:** the `[DataDemo]` lines in the console aren't the data layer logging — those are `Logger.info` calls in the *component* announcing user actions (transport changed, loadItems requested, etc.). The empty-cell claim is about *automatic request/response logging at the data layer*, which we'll wire up for free in the PnPjs pass. To avoid confusion, keep DevTools focused on the Network tab during Pass 1 demos.
 
 ---
 

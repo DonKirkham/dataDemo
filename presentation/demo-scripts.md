@@ -209,7 +209,8 @@ Already wired. `@pnp/logging` is wrapped in [utilities/logger.ts](src/webparts/d
 2. **Open the property pane.** Toggle **Enhanced logging** off if it's on. Click Refresh on the web part — Console is mostly quiet (Warning level only).
 3. **Toggle Enhanced logging on.** Click Refresh again.
 4. **Show the Console.** Each call emits `[DataDemo] ...` lines via `console.info`/`console.debug`, with object payloads rendered as collapsible trees (because we emit through `console.*`, not a flat string).
-   - **Say:** "One toggle. `@pnp/logging` underneath, behind a small wrapper. Swap `ConsoleListener` for an App Insights listener and the same `Logger.info(...)` calls become production telemetry."
+5. **Click the source link on the right side of any log line.** DevTools jumps to the actual call site (e.g. `JokePanel.tsx:42`), not to `logger.ts`.
+   - **Say:** "One toggle. `@pnp/logging` underneath, behind a small wrapper. Swap `ConsoleListener` for an App Insights listener and the same `Logger.info(...)` calls become production telemetry. And because the wrapper pre-binds `console.*`, the source link still points where you actually wrote the call — the wrapper isn't a tax, it's an asset."
 
 ### 7b — Caching (2 min)
 
