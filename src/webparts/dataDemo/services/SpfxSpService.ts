@@ -16,6 +16,7 @@ export class SpfxSpService implements ISpService {
   public async getItems(list: IListIdentifier): Promise<IEventItem[]> {
     const url = `${this.siteUrl}/_api/web/lists/getbytitle('${list.title}')/items`
       + `?$select=Id,Title,Session,SessionDate,SessionType,EventSite,SessionLink,Speaker/Id,Speaker/Title,Speaker/EMail`
+      //+ `&$top=5` // Uncomment this line to show how paging works
       + `&$expand=Speaker`
       + `&$filter=${encodeURIComponent(`SessionDate ge datetime'${startOfTodayIso()}'`)}`
       + `&$orderby=SessionDate asc`;

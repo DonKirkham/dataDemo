@@ -138,14 +138,6 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
     }
   }, [loadItems]);
 
-  // Initialize on mount and when props change
-  React.useEffect(() => {
-    Logger.write(`[DataDemo] mount/props effect: site=${site?.id ?? 'none'}, list=${list?.id ?? 'none'}`, LogLevel.Verbose);
-    initServiceAndLoad(transport, endpoint, factory, site, list)
-      .catch(() => { /* handled internally */ });
-  }, [factory, site?.id, list?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Re-initialize when transport or endpoint changes
   const onTransportChanged = React.useCallback((item?: PivotItem): void => {
     if (!item) return;
     const newTransport = item.props.itemKey as Transport;
@@ -176,15 +168,16 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
     });
   }, []);
 
-  // React to transport/endpoint state changes
+  // Initialize on mount and re-initialize when inputs change
   React.useEffect(() => {
     if (PLACEHOLDER_ENDPOINTS.indexOf(endpoint) >= 0) {
       Logger.write(`[DataDemo] endpoint ${endpoint} is a placeholder, skipping service init`, LogLevel.Verbose);
       return;
     }
+    Logger.write(`[DataDemo] init effect: site=${site?.id ?? 'none'}, list=${list?.id ?? 'none'}, transport=${transport}, endpoint=${endpoint}`, LogLevel.Verbose);
     initServiceAndLoad(transport, endpoint, factory, site, list)
       .catch(() => { /* handled internally */ });
-  }, [transport, endpoint]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [factory, site?.id, list?.id, transport, endpoint]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onAddItem = React.useCallback((): void => {
     setShowDialog(true);
