@@ -362,58 +362,72 @@ The same pipeline that talks to SharePoint can talk to **anything**. You just co
 
 ## Slide 18 — The free upgrades
 
-Three lines of code. Three real problems gone.
+Three toggles. Three real problems gone.
 
 ```ts
-// 1. Logging
-import { Logger, LogLevel, ConsoleListener } from '@pnp/logging';
-Logger.subscribe(ConsoleListener());
-Logger.activeLogLevel = LogLevel.Info;
+// 1. Logging — @pnp/logging wrapped once; level driven by a property-pane toggle.
+Logger.attachConsoleListener();
+Logger.setLevel(this.properties.enhancedLogging ? LogLevel.Verbose : LogLevel.Warning);
 
-// 2. Caching
-sp.web.lists.getByTitle('Speaking Events').items.using(Caching())();
+// 2. Caching — one line on the SPFI, toggled by un/commenting in ServiceFactory.
+const sp = spfi(siteUrl)
+  .using(spSPFx(this.context))
+  .using(Caching({ store: 'session' })); // <-- the only line that flips
 
-// 3. Batching
-const [batchedSp, execute] = sp.batched();
-batchedSp.web.lists.getByTitle('Speaking Events').items.add(item1);
-batchedSp.web.lists.getByTitle('Speaking Events').items.add(item2);
-batchedSp.web.lists.getByTitle('Speaking Events').items.add(item3);
-await execute(); // one $batch request, three operations
+// 3. Batching — pack many reads (or writes) into one $batch envelope.
+const [batchedSp, execute] = sp.batched({ maxRequests: 100 });
+const pagePromises: Promise<IEventItem[]>[] = [];
+for (let i = 0; i < pageCount; i++) {
+  pagePromises.push(
+    batchedSp.web.lists.getByTitle('Speaking Events').items
+      .top(pageSize).skip(i * pageSize)() as Promise<IEventItem[]>
+  );
+}
+await execute(); // one HTTP request to /_api/$batch
 ```
 
 [Demo cue → Demo 7]
 
 Speaker notes:
-- The Caching demo is the visceral one. Click → wait → click → instant. Network tab tells the whole story.
-- The batching demo is the *architectural* one. Five POSTs collapse into one.
+- The Caching demo is the visceral one. Click → wait → click → instant. Network tab tells the whole story. Session-store means it even survives a hard refresh.
+- The batching demo is the *architectural* one. 100 paginated reads collapse into one HTTP request.
 
 ---
 
 ## Slide 19 — What logging gets you
 
 ```
-[2026-04-28T14:32:01.234Z] [Info]  GET https://contoso.sharepoint.com/_api/web/lists/...
-[2026-04-28T14:32:01.512Z] [Info]  Response: 200 OK (278ms)
-[2026-04-28T14:32:01.514Z] [Info]  Cache MISS for /_api/web/lists/...
+[DataDemo] onInit: starting (enhancedLogging=on)
+[DataDemo] loadItems: requesting items from list Speaking Events
+[DataDemo] loadItems: received 12 item(s)        ▶ (12) [{…}, {…}, …]
 ```
 
-You can swap `ConsoleListener` for your own — App Insights, Splunk, custom telemetry. The Logger is **a contract**, not a tool.
+A thin wrapper over `@pnp/logging` (info / debug / warn / error) emits via `console.*` so object payloads render as collapsible trees. Listeners are pluggable — `ConsoleListener` today, App Insights tomorrow. Same call sites.
 
 Speaker notes:
 - Tease: "If you're shipping into production without observability on your data calls, this is the easiest win you'll ever take."
+- The wrapper isn't a hard requirement — `Logger.subscribe(ConsoleListener())` works out of the box. The wrapper just lets us prefix `[DataDemo]` and route through `console.info`/`console.debug` for the collapsible-tree affordance.
 
 ---
 
 ## Slide 20 — What caching gets you
 
-`Caching()` defaults: in-memory, 60-second expiry, keyed by URL.
+Two scopes. Pick one.
 
 ```ts
-import { Caching } from '@pnp/queryable';
-sp.using(Caching());           // global
-// or per-call:
-.items.using(Caching({ store: 'session', expireFunc: () => addMinutes(new Date(), 5) }))();
+// Global: every read on this SPFI is cached.
+const sp = spfi(siteUrl)
+  .using(spSPFx(this.context))
+  .using(Caching({ store: 'session' })); // 'session' | 'local'
+
+// Per-call: opt one query *out* of caching when global is on.
+.items.using(CacheNever())()
+
+// Per-call: opt one query *in* with a custom expiry when global is off.
+.items.using(Caching({ store: 'session', expireFunc: () => addMinutes(new Date(), 5) }))()
 ```
+
+Defaults: 60-second expiry, keyed by URL. `'session'` survives a hard refresh; `'local'` survives a tab close. (Default is in-memory and dies with the page.)
 
 When to use it:
 - Reference data (lookups, choice columns, taxonomies)
@@ -422,31 +436,41 @@ When to use it:
 
 When **not** to use it:
 - Frequently-changing transactional data
-- Anything where stale = wrong
+- Anything where stale = wrong (use `CacheNever()` on those queries)
 
 ---
 
 ## Slide 21 — What batching gets you
 
+Reads, in our demo. Writes work the same way.
+
 ```ts
-const [batched, execute] = sp.batched();
-for (const event of newEvents) {
-  batched.web.lists.getByTitle('Speaking Events').items.add(event);
+const [batchedSp, execute] = this.sp.batched({ maxRequests: 100 });
+const pagePromises: Promise<IEventItem[]>[] = [];
+for (let i = 0; i < pageCount; i++) {
+  pagePromises.push(
+    batchedSp.web.lists.getByTitle(list.title).items
+      .select('Id', 'Title', 'SessionDate', /* ... */)
+      .orderBy('SessionDate', true)
+      .top(pageSize).skip(i * pageSize)() as Promise<IEventItem[]>
+  );
 }
 await execute();
+const items = (await Promise.all(pagePromises)).flat();
 ```
 
-Five `add` calls → one HTTP request to `/_api/$batch`.
+100 paginated reads → **one** HTTP request to `/_api/$batch`. The same wiring works for `add`/`update`/`delete`.
 
 Why it matters:
-- **Latency**: one round trip beats five. Especially over slow links.
-- **Throttling**: SharePoint counts requests, not items. Batching is your throttle escape hatch.
-- **Atomicity-ish**: not a real transaction, but closer than five independent calls.
+- **Latency**: one round trip beats N. Especially over slow links.
+- **Throttling**: SharePoint counts requests, not inner operations. Batching is your throttle escape hatch.
+- **Atomicity-ish**: not a real transaction, but closer than N independent calls.
 
 [Demo cue → Demo 7 batching segment]
 
 Speaker notes:
-- Be honest: `$batch` is not transactional. If item 3 fails, items 1 and 2 still happened. PnPjs surfaces per-operation results.
+- Be honest: `$batch` is not transactional. If page 3 fails, pages 1 and 2 still came back. PnPjs surfaces per-operation results so you can detect partial failures.
+- The demo uses paginated *reads* because the Speaking Events list isn't big enough for a bulk-write story to land. The pattern is identical for writes — same `batched()` call, different inner verbs.
 
 ---
 

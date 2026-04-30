@@ -26,6 +26,10 @@ Every demo is "click the right Pivot tab, then do the operation." The code diffe
   - `PnPjsAnonymousService.ts`
 - [ ] Backup screen recording of each demo on local disk in case the tenant flakes
 - [ ] Joke API smoke-tested (`https://official-joke-api.appspot.com/random_joke` returns 200) — it's a free public API and goes down sometimes
+- [ ] **Demo 7 baseline state confirmed:**
+  - [ ] In `ServiceFactory.ts`, the `.using(Caching({ store: 'session' }))` line is **commented out** (caching off until 7b)
+  - [ ] In `PnPjsSpService.getItems`, the **single-call** return (above the BATCHED block) is **active**; the BATCHED block below is **commented out**
+  - [ ] Browser sessionStorage cleared (DevTools → Application → Storage → Clear site data) so 7b shows a real cache miss → hit progression
 
 ---
 
@@ -198,66 +202,63 @@ This demo requires three small code changes you'll make live OR pre-stage as a s
 
 ### 7a — Logging (1.5 min)
 
+Already wired. `@pnp/logging` is wrapped in [utilities/logger.ts](src/webparts/dataDemo/utilities/logger.ts), attached in `onInit`, and the level is driven by an **Enhanced logging** property-pane checkbox. No live editing.
+
 **Steps:**
 1. **Open browser Console tab** (alongside Network).
-2. **Show the code change** in VS Code — adding these lines at the top of `PnPjsSpService.ts` constructor (or in `DataDemoWebPart.ts` `onInit`):
-   ```ts
-   import { Logger, LogLevel, ConsoleListener } from '@pnp/logging';
-   Logger.subscribe(ConsoleListener());
-   Logger.activeLogLevel = LogLevel.Info;
-   ```
-3. **Save, let HMR refresh.**
-4. **Click Refresh on the web part.**
-5. **Show the Console tab.** PnPjs is now logging every request, every response timing, every cache hit/miss.
-   - **Say:** "Three lines. Now you have observability. Swap `ConsoleListener` for an App Insights listener and it's production telemetry."
+2. **Open the property pane.** Toggle **Enhanced logging** off if it's on. Click Refresh on the web part — Console is mostly quiet (Warning level only).
+3. **Toggle Enhanced logging on.** Click Refresh again.
+4. **Show the Console.** Each call emits `[DataDemo] ...` lines via `console.info`/`console.debug`, with object payloads rendered as collapsible trees (because we emit through `console.*`, not a flat string).
+   - **Say:** "One toggle. `@pnp/logging` underneath, behind a small wrapper. Swap `ConsoleListener` for an App Insights listener and the same `Logger.info(...)` calls become production telemetry."
 
 ### 7b — Caching (2 min)
 
+The wiring is already in `ServiceFactory.ts` — the `.using(Caching({ store: 'session' }))` line is there, just commented out. You uncomment one line. No live editing of import statements, no HMR roulette.
+
 **Steps:**
-1. **Show the code change:** add `Caching()` to the SPFI:
+1. **Open VS Code to [ServiceFactory.ts:46-50](src/webparts/dataDemo/services/ServiceFactory.ts#L46-L50).** Show the current state — the `.using(Caching(...))` line is commented:
    ```ts
-   import { Caching } from '@pnp/queryable';
-   const sp = spfi(siteUrl).using(spSPFx(this.context), Caching());
+   const sp = spfi(site.url)
+     .using(spSPFx(this.context as any))
+     //.using(Caching({ store: 'session' })); // comment out to disable caching
    ```
-2. **Save, let HMR refresh.**
+2. **Uncomment the line.** Save. Let HMR refresh.
 3. **Clear the Network tab.**
 4. **Click Refresh on the web part.** Show one request go out.
-5. **Click Refresh again immediately.** Show **zero new requests** — and the data is back instantly.
-   - **Say (slow it down):** "Watch the Network tab. First click — request goes out. Second click — *nothing*. The data renders instantly because it came from in-memory cache."
-6. **Wait 60 seconds (default expiry)** OR open a new tab. Click Refresh. Network request again.
-   - **Say:** "60-second default. You can tune it. You can swap to session storage. You can scope it to one query instead of globally."
+5. **Click Refresh again immediately.** Show **zero new requests** — data is back instantly.
+   - **Say (slow it down):** "Watch the Network tab. First click — request goes out. Second click — *nothing*. The data renders instantly because it came from sessionStorage."
+6. **Hard-refresh the browser (Ctrl+F5).** Click Refresh on the web part once more.
+   - **Say:** "Notice — still no network request. That's because we used `store: 'session'`. The default cache is in-memory and dies with the page. Session storage survives a refresh, local storage survives a tab close. Pick the scope that matches your data's freshness budget."
+7. **Show [PnPjsSpService.ts:23-30](src/webparts/dataDemo/services/PnPjsSpService.ts#L23-L30).** Point at the commented `.using(CacheNever())` line on the items query.
+   - **Say:** "When global caching is on but one specific query has to be live — pricing, inventory, anything where stale equals wrong — `CacheNever()` opts that single query out. Composable, per-call, no global state to wrangle."
+8. **(Optional reset)** Re-comment the `.using(Caching(...))` line before moving on, so the next demo isn't reading stale data.
 
 ### 7c — Batching (2.5 min)
 
-This is the one we simulated. Pre-stage the code:
+We pivoted away from "Bulk Add 5 writes" — the Speaking Events list isn't big enough for a write-heavy story to land. Instead we batch **paginated reads**: 100 calls of `top(5)/skip(N)` packaged into one `$batch` envelope. Same `sp.batched()` call, same payoff.
 
-```ts
-public async createMany(list: IListIdentifier, items: IEventItem[]): Promise<void> {
-  const [batchedSp, execute] = this.sp.batched();
-  for (const item of items) {
-    batchedSp.web.lists.getByTitle(list.title).items.add(toSpWritePayload(item));
-  }
-  await execute();
-}
-```
-
-Wire a "Bulk Add 5 Demo Events" button to call this with 5 throwaway items.
+The wiring is in `PnPjsSpService.getItems`, gated by a comment block. You toggle which version runs by flipping which block is commented out. Pre-flight before the demo: make sure the *single-call* version is active so Demo 4–6 looked normal.
 
 **Steps:**
-1. **First, the SPFx-native baseline.** Click Pivot to *SPFx* → *SharePoint*.
-2. **Have a "Bulk Add 5" button** that calls `createItem` five times in a Promise.all. (Pre-stage this too.)
-3. **Clear Network tab. Click Bulk Add 5.**
-4. **Count the requests.** Five separate `POST /_api/web/lists/.../items` requests.
-   - **Say:** "Five items, five requests. Five round trips to SharePoint. Each one counts toward your throttling quota."
-5. **Click Pivot to *PnPjs* → *SharePoint*.**
-6. **Clear Network tab. Click Bulk Add 5.**
-7. **Count the requests.** **One** request to `/_api/$batch`.
-   - **Say:** "Same five items. One request. One round trip. One throttle hit."
-8. **Click the `$batch` request, show the body.** It's a multipart body with five inner POSTs. Show the audience the shape.
-   - **Say:** "SharePoint always supported `$batch`. Most code never uses it because building this multipart body by hand is awful. PnPjs builds it for you."
+1. **Pivot stays at *PnPjs* → *SharePoint*.**
+2. **Open VS Code to [PnPjsSpService.ts:19-59](src/webparts/dataDemo/services/PnPjsSpService.ts#L19-L59).** Show the audience both blocks side-by-side: the single-call return (active) above, the batched block (commented out) below.
+   - **Say:** "These are the same query. The top one runs as one HTTP GET. The bottom one fires 100 paginated GETs of 5 items each, packed into one $batch POST. Watch the network tab as I switch them."
+3. **Comment out the single-call return** (lines 22-31) and **uncomment the batched block** (lines 33-56). Save. Let HMR refresh.
+4. **Clear the Network tab.**
+5. **Click Refresh on the web part.**
+6. **Show the network tab.** Exactly **one** request: `POST /_api/$batch`. No 100 separate gets.
+   - **Say:** "100 page reads. One HTTP request. SharePoint counts requests, not items, when it throttles you — this *is* the throttle escape hatch."
+7. **Click the `$batch` request → Payload tab.** Show the multipart body. Each part is a `GET ...?$top=5&$skip=N` line.
+   - **Say:** "PnPjs built this multipart body for you. Doing it by hand is the reason most SPFx code never uses `$batch` even though SharePoint's supported it forever."
+8. **Click the Response tab.** Show the matching multipart response — one inner result per inner request.
+   - **Say:** "Per-page results come back in the same envelope. The pages we fired off as a `Promise.all` resolve when `execute()` returns."
+9. **Compare against SPFx mentally.** Switch to [SpfxSpService.ts:19](src/webparts/dataDemo/services/SpfxSpService.ts#L19) — the commented `&$top=5` line.
+   - **Say:** "On the SPFx-native side there's no batching primitive at all. To page through 500 items in chunks of 5 you'd fire 100 separate XHRs. `Promise.all` parallelizes them client-side, but SharePoint still sees 100 requests. Batching turns that into one."
+10. **(Reset)** Re-comment the batched block and uncomment the single-call return before continuing — otherwise Q&A demos will look weird.
 
 **Honesty beat at the end:**
-- **Say:** "One caveat. `$batch` is not a database transaction. If item 3 fails, items 1 and 2 still happened. PnPjs surfaces per-operation results so you can detect partial failures. Plan your retry logic accordingly."
+- **Say:** "One caveat. `$batch` is not a database transaction. If page 3 fails, pages 1 and 2 still came back. PnPjs surfaces per-operation results so you can detect partial failures. Plan your retry logic accordingly."
+- **Say (if asked about writes):** "Same `sp.batched()` call. Swap `top/skip` for `add/update/delete`. Five POSTs in one envelope works exactly the same way — we just don't have a list big enough for the read story to be the dramatic one in this room."
 
 ---
 
@@ -270,7 +271,8 @@ Wire a "Bulk Add 5 Demo Events" button to call this with 5 throwaway items.
 | Joke API down | Skip Demo 3, mention it in passing during slide 10. |
 | Graph permission denied (`/me/messages`) | Stick to `/me` and `/sites/root` in Demo 2. |
 | HMR breaks during live code edits in Demo 7 | Don't fight it — fall back to "this is what the code looks like" in VS Code, point at the slide. |
-| Caching demo doesn't show instant second click | Check that `Caching()` was added to the SPFI in `ServiceFactory`, not just the local query. Most likely cause: edited the wrong file. |
+| Caching demo doesn't show instant second click | The `.using(Caching({ store: 'session' }))` line in `ServiceFactory.ts` is on the SPFI, not the per-call query. Confirm you uncommented *that* line, not something else. Also: stale sessionStorage from a previous run will mask the "first click → real request" beat — clear site data and retry. |
+| Batching demo still shows N requests | You uncommented the batched block but forgot to comment out the single-call `return` above it — both ran. Re-check that exactly one of the two paths is active in `PnPjsSpService.getItems`. |
 | Audience asks an aggressive "PnPjs is bloat" question mid-demo | "Let's hold that for the wrap slide — slide 22 has the honest answer." Don't get pulled off the demo arc. |
 
 ---

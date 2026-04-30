@@ -47,7 +47,7 @@ Don picked a fourth: **two passes over the same problem space.** Pass 1 teaches 
 ## Decisions already made
 
 1. **Graph Explorer demo lives in Pass 1**, not Pass 2 (Don's call). It's the SPFx `MSGraphClientV3` exposed as a sandbox, so it belongs with the SPFx-native pass. It's also useful as emotional fuel — the audience sees raw Graph JSON and starts feeling the "I'm parsing this by hand" pain before the pivot.
-2. **Batching demo will be simulated**, not real (Don doesn't have a big enough list). Specifically: pre-stage a "Bulk Add 5" button, show 5 separate POSTs in SPFx-native vs 1 `$batch` POST in PnPjs. "5 → 1" is more dramatic than "1 → many." See `demo-scripts.md` Demo 7c for the wiring.
+2. **Batching demo is a paginated read, not bulk writes.** The list isn't big enough for a write-heavy story. Instead, `PnPjsSpService.getItems` carries two implementations gated by comment markers — a single-call return and a batched block that fires 100 `top(5)/skip(N)` reads through `sp.batched({ maxRequests: 100 })`. Network tab shows 100 page reads collapse into one `POST /_api/$batch`. The "same `sp.batched()` call works for writes" note covers the bulk-write angle verbally. See `demo-scripts.md` Demo 7c.
 3. **Honest framing throughout**, not PnPjs evangelism. Slide 16 says explicitly that Graph awkwardness is a Graph problem (not a PnPjs problem). Slide 22 lists when *not* to use PnPjs (bundle size, one-off calls, debugging at the wire).
 4. **Demo time > slide time.** We accepted 45/55 instead of 60/40 because the demos *are* the argument. If timing pressure forces cuts, see the "Timing reminders" section at the end of `demo-scripts.md`.
 
@@ -57,12 +57,12 @@ Don picked a fourth: **two passes over the same problem space.** Pass 1 teaches 
 
 These are the things Don needs to address before the talk. Order matters:
 
-1. **Build the "Bulk Add 5" button.** ~30–60 min of real code work. The batching demo (7c) doesn't function without it. Pre-stage on a feature branch so you check it out only for that demo segment. Wire it to a `createMany(items)` method on `PnPjsSpService` that uses `sp.batched()` (sketched in `slides.md` slide 18 and `demo-scripts.md` Demo 7c).
+1. ~~**Build the "Bulk Add 5" button.**~~ **Superseded.** We pivoted away from bulk writes — the Speaking Events list isn't big enough for that story to land in the room. The batching demo is now a paginated *read* in `PnPjsSpService.getItems`: 100 calls of `top(5)/skip(N)` packed into one `sp.batched({ maxRequests: 100 })` envelope. The single-call vs batched paths are both in the file, gated by comment markers; the demo flips which block is active. Slide 21 and Demo 7c reflect this.
 2. **Verify the bundle-size claim** on slide 22 ("PnPjs adds ~50–80 KB"). That number is approximate, not measured. Run `heft package-solution --production` against a build with and without PnPjs and check actual deltas. If the number is way off, update the slide.
 3. **Decide the format for slide 11 (the pivot).** Current draft is a five-column missing-features table. Alternative discussed: a screenshot of SPFx Graph code with five colored highlights, each labeled with what's missing. The screenshot version has more visual punch but takes longer to produce. Either works.
-4. **Pre-talk setup checklist** (top of `demo-scripts.md`) — the Speaking Events list needs ~10 seeded items with a mix of past/future dates, and at least one disposable test item.
+4. **Pre-talk setup checklist** (top of `demo-scripts.md`) — the Speaking Events list needs ~10 seeded items with a mix of past/future dates, and at least one disposable test item. The checklist now also asserts the Demo 7 baseline state (caching commented off, single-call read active, sessionStorage cleared).
 5. **Backup screen recordings** for each demo. Tenant network is unpredictable.
-6. **Pre-stage logging/caching/batching code** for Demo 7. Live editing fluent chains under presentation pressure is asking for trouble. Either branch the changes in or comment them in/out as needed.
+6. ~~**Pre-stage logging/caching/batching code** for Demo 7.~~ **Done.** Caching is a one-line uncomment in `ServiceFactory.ts` (`.using(Caching({ store: 'session' }))`), with a `CacheNever()` per-call opt-out commented in `PnPjsSpService.getItems`. Batching is the comment-block swap described in item 1. No live editing of fluent chains during the talk.
 
 ---
 
