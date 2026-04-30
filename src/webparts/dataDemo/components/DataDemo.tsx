@@ -125,7 +125,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
     const graphQuery = ep === 'MS Graph (Explorer)';
     const needsSite = !anon && !graphQuery;
 
-    Logger.info(`initServiceAndLoad: transport=${t}, endpoint=${ep}`);
+    Logger.debug(`initServiceAndLoad: transport=${t}, endpoint=${ep}`);
 
     if (!f || (needsSite && (!s || !l))) {
       Logger.debug('initServiceAndLoad: skipping (factory/site/list missing)');
