@@ -12,10 +12,13 @@ interface IJokeResponse {
   punchline: string;
 }
 
+const JOKE_URL = 'https://official-joke-api.appspot.com/random_joke';
+
 export class PnPjsAnonymousService implements IJokeService {
+  public readonly url = JOKE_URL;
 
   public async getJoke(): Promise<IJoke> {
-    const q = new Queryable('https://official-joke-api.appspot.com/random_joke');
+    const q = new Queryable(this.url);
     q.using(BrowserFetch(), RejectOnError(), ResolveOnData(), JSONParse());
     // Strip PnPjs tracking header to avoid CORS preflight on external APIs
     q.on.pre(async (url, init, result) => {

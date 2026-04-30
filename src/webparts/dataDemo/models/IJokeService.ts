@@ -8,5 +8,6 @@ export interface IJoke {
 }
 
 export interface IJokeService {
+  readonly url: string;
   getJoke(): Promise<IJoke>;
 }

@@ -15,6 +15,7 @@ import {
   SpinnerSize
 } from '@fluentui/react';
 import { IGraphQueryService } from '../models/IGraphQueryService';
+import { Logger } from '../utilities/logger';
 import styles from './DataDemo.module.scss';
 
 const stackTokens: IStackTokens = { childrenGap: 10 };
@@ -58,11 +59,15 @@ const GraphExplorer: React.FC<IGraphExplorerProps> = ({ service }) => {
     setErrorBody(undefined);
     setErrorMessage(undefined);
 
+    Logger.info(`runQuery: GET ${path}`);
+
     try {
       const result = await service.runQuery(path);
+      Logger.debug(`runQuery: response for ${path}`, result);
       setResponse(result);
     } catch (err) {
       const e = err as { message?: string; statusCode?: number; body?: unknown; code?: string };
+      Logger.error(`runQuery failed: ${e.message ?? 'Request failed'}`, err);
       setErrorMessage(e.message ?? 'Request failed');
       // Graph client errors typically expose body as a JSON string
       let parsedBody: unknown = e.body;

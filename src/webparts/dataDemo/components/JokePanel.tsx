@@ -4,6 +4,7 @@
 import * as React from 'react';
 import styles from './JokePanel.module.scss';
 import { IJokeService } from '../models/IJokeService';
+import { Logger } from '../utilities/logger';
 import {
   DefaultButton,
   MessageBar,
@@ -35,7 +36,10 @@ const JokePanel: React.FC<IJokePanelProps> = ({ service }) => {
     setError(undefined);
     setShowPunchline(false);
 
+    Logger.info(`loadJoke: GET ${service.url}`);
+
     service.getJoke().then((joke) => {
+      Logger.debug('loadJoke: received joke', joke);
       setSetup(joke.setup);
       setPunchline(joke.punchline);
       setLoading(false);
@@ -44,6 +48,7 @@ const JokePanel: React.FC<IJokePanelProps> = ({ service }) => {
         setShowPunchline(true);
       }, 3000);
     }).catch((err: Error) => {
+      Logger.error(`loadJoke failed: ${err.message}`, err);
       setLoading(false);
       setError(`Failed to fetch joke: ${err.message}`);
     });

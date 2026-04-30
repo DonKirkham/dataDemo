@@ -11,12 +11,16 @@ interface IJokeResponse {
   punchline: string;
 }
 
+const JOKE_URL = 'https://official-joke-api.appspot.com/random_joke';
+
 export class SpfxAnonymousService implements IJokeService {
+  public readonly url = JOKE_URL;
+
   constructor(private httpClient: HttpClient) {}
 
   public async getJoke(): Promise<IJoke> {
     const response: HttpClientResponse = await this.httpClient.get(
-      'https://official-joke-api.appspot.com/random_joke',
+      this.url,
       HttpClient.configurations.v1
     );
 
