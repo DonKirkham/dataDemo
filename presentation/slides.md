@@ -129,6 +129,48 @@ Note the ceremony:
 
 ---
 
+## Slide 6a — SPFx + SP REST: add
+
+```ts
+public async createItem(list, item): Promise<IEventItem> {
+  const url = `${this.siteUrl}/_api/web/lists/getbytitle('${list.title}')/items`;
+  const options = { body: JSON.stringify(toSpWritePayload(item)) };
+  const response = await this.spHttpClient.post(url, SPHttpClient.configurations.v1, options);
+  if (!response.ok) throw new Error(`Failed to create item: ${response.statusText}`);
+  return await response.json() as IEventItem;
+}
+```
+
+The cleanest verb in the SP REST set — a real POST to the list endpoint. No `IF-MATCH`, no `X-HTTP-Method` override. The body is just your fields.
+
+> And no, you don't need `ListItemEntityTypeFullName` — that was an `odata=verbose` thing. SPFx defaults to `nometadata`, so the body is just your fields.
+
+Speaker notes:
+- Bonus / flex slide. Skip if pressed for time.
+- Pre-empt the audience question: "Don't I need to send `__metadata: { type: 'SP.Data.…ListItem' }` on create?" Only under `odata=verbose`. SPFx ships `nometadata` by default; PnPjs's `.items.add()` doesn't include it either. Multi-content-type lists are the one edge case — and there the modern fix is setting `ContentTypeId` in the payload, not `__metadata`.
+
+---
+
+## Slide 6b — SPFx + SP REST: delete
+
+```ts
+public async deleteItem(list, itemId): Promise<void> {
+  const url = `${this.siteUrl}/_api/web/lists/getbytitle('${list.title}')/items(${itemId})`;
+  const options = { headers: { 'IF-MATCH': '*', 'X-HTTP-Method': 'DELETE' } };
+  const response = await this.spHttpClient.post(url, SPHttpClient.configurations.v1, options);
+  if (!response.ok) throw new Error(`Failed to delete item ${itemId}: ${response.statusText}`);
+}
+```
+
+Delete is **another POST.** The only thing that turns it into a delete is `X-HTTP-Method: DELETE` in the headers. Same `IF-MATCH: '*'` opt-out as update.
+
+Speaker notes:
+- Bonus / flex slide.
+- Anticipated question: "Why isn't this just `spHttpClient.delete()`?" Because the SharePoint REST endpoint expects a POST with the override header. SPFx's `SPHttpClient` mirrors what the wire wants.
+- Mention this is the same pattern as update — POST + header override is the SP REST way of expressing every non-GET, non-create verb.
+
+---
+
 ## Slide 7 — When SP REST stops being enough
 
 Reach for **MS Graph** when:
@@ -168,6 +210,49 @@ Three Graph-specific gotchas already on this slide:
 Speaker notes:
 - The `Prefer` header is a fallback for non-indexed columns — **unreliable**. Indexing is the real fix.
 - "If you've never seen these errors, that's because you've been using PnPjs and you didn't know it was hiding them."
+
+---
+
+## Slide 8a — SPFx + Graph: add
+
+```ts
+public async createItem(list, item): Promise<IEventItem> {
+  const response = await this.graphClient
+    .api(`/sites/${this.siteId}/lists/${list.id}/items`)
+    .version('v1.0')
+    .post({ fields: toGraphWriteFields(item) });
+  return fromGraphItem(response as IGraphListItem);
+}
+```
+
+A real `.post()`. No method-override gymnastics, no `IF-MATCH`.
+
+But the `{ fields: … }` envelope is mandatory — Graph won't accept a flat field bag. And `toGraphWriteFields` does the same translations as the SP REST mapper (Speaker → `SpeakerLookupId`, URL → `{ Url, Description }`, …). The mapping ceremony is a SharePoint shape problem, not an HTTP-client problem.
+
+Speaker notes:
+- Bonus / flex slide.
+- The honesty beat: Graph's verbs are nicer than SP REST's, but the field-shape mapping is unchanged.
+
+---
+
+## Slide 8b — SPFx + Graph: delete
+
+```ts
+public async deleteItem(list, itemId): Promise<void> {
+  await this.graphClient
+    .api(`/sites/${this.siteId}/lists/${list.id}/items/${itemId}`)
+    .version('v1.0')
+    .delete();
+}
+```
+
+The cleanest delete in the deck. A real `.delete()`. No POST. No `X-HTTP-Method`. No `IF-MATCH`.
+
+> The SP REST workaround (POST + override header) is REST-the-protocol's fault, not Graph's.
+
+Speaker notes:
+- Bonus / flex slide.
+- If asked about soft-delete vs hard-delete: Graph deletes are hard. If you want recycle-bin behavior, SP REST has `recycle()` — Graph does not.
 
 ---
 
@@ -321,6 +406,60 @@ Compare to SPFx:
 - No URL.
 
 Same `toSpWritePayload` mapper — that's a SharePoint shape problem, not an HTTP-client problem.
+
+---
+
+## Slide 15a — PnPjs: add
+
+```ts
+// PnPjs SP
+const result = await this.sp.web.lists
+  .getByTitle(list.title)
+  .items
+  .add(toSpWritePayload(item));
+
+// PnPjs Graph
+await this.graph.sites
+  .getById(this.siteId)
+  .lists.getById(list.id)
+  .items
+  .add({ fields: toGraphWriteFields(item) });
+```
+
+Same `.add()` verb across **both** APIs. The only difference is the path-builder chain — and that's the API surface, not the HTTP layer.
+
+Speaker notes:
+- Bonus / flex slide. Pairs with 6a and 8a if you're doing the full "compare across all three" beat.
+- The Graph version still needs the `{ fields: … }` envelope — PnPjs doesn't hide that because the Graph endpoint requires it. PnPjs hides transport ceremony, not API shape.
+
+---
+
+## Slide 15b — PnPjs: delete
+
+```ts
+// PnPjs SP
+await this.sp.web.lists
+  .getByTitle(list.title)
+  .items
+  .getById(itemId)
+  .delete();
+
+// PnPjs Graph
+await this.graph.sites
+  .getById(this.siteId)
+  .lists.getById(list.id)
+  .items
+  .getById(itemId.toString())
+  .delete();
+```
+
+No URLs. No `IF-MATCH`. No `X-HTTP-Method`. Same `.delete()` across both.
+
+> PnPjs normalizes the verb across SP REST (which fakes DELETE via POST) and Graph (which uses real DELETE). Your code reads the same either way.
+
+Speaker notes:
+- Bonus / flex slide.
+- Tease back to slides 6b and 8b: "Remember the SP REST `X-HTTP-Method: DELETE` trick? PnPjs handles that for you. The Graph version drops to a real DELETE underneath — same call site, different wire format."
 
 ---
 

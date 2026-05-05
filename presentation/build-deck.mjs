@@ -28,6 +28,169 @@ const FONT = {
   mono: 'Consolas',
 };
 
+// ---------- TS SYNTAX HIGHLIGHTING ----------
+const SYN = {
+  keyword: 'C678DD', // purple — const, await, public, return, this, …
+  string:  '98D894', // sage green — '…', "…", `…`
+  number:  'FFB347', // amber — 12, 1.5
+  comment: '6B7299', // muted — // line comments
+  type:    '00E5FF', // cyan — capitalized identifiers, builtin types
+  func:    '82AAFF', // blue — identifiers immediately followed by (
+  ident:   'F0F4FF', // ink — variables, properties, params
+  punct:   'F0F4FF', // ink — whitespace, operators, brackets
+};
+
+const TS_KEYWORDS = new Set([
+  'const', 'let', 'var', 'await', 'async', 'public', 'private', 'protected',
+  'return', 'throw', 'new', 'as', 'function', 'if', 'else', 'for', 'while',
+  'import', 'from', 'export', 'class', 'interface', 'type',
+  'true', 'false', 'null', 'undefined', 'this', 'extends', 'implements',
+  'try', 'catch', 'finally', 'in', 'of', 'typeof', 'instanceof',
+  'static', 'readonly', 'enum', 'switch', 'case', 'default', 'break', 'continue',
+]);
+
+const TS_TYPES = new Set([
+  'string', 'number', 'boolean', 'any', 'unknown', 'never', 'void',
+]);
+
+function tokenizeTsLine(line) {
+  const tokens = [];
+  let i = 0;
+  while (i < line.length) {
+    const c = line[i];
+
+    // Line comment — consumes rest of line
+    if (c === '/' && line[i + 1] === '/') {
+      tokens.push({ type: 'comment', text: line.slice(i) });
+      return tokens;
+    }
+
+    // Single-quoted string
+    if (c === "'") {
+      let j = i + 1;
+      while (j < line.length && line[j] !== "'") {
+        if (line[j] === '\\' && j + 1 < line.length) j += 2; else j++;
+      }
+      const end = Math.min(j + 1, line.length);
+      tokens.push({ type: 'string', text: line.slice(i, end) });
+      i = end;
+      continue;
+    }
+
+    // Double-quoted string
+    if (c === '"') {
+      let j = i + 1;
+      while (j < line.length && line[j] !== '"') {
+        if (line[j] === '\\' && j + 1 < line.length) j += 2; else j++;
+      }
+      const end = Math.min(j + 1, line.length);
+      tokens.push({ type: 'string', text: line.slice(i, end) });
+      i = end;
+      continue;
+    }
+
+    // Template literal — recurse into ${...} interpolations
+    if (c === '`') {
+      let j = i + 1;
+      let buf = '`';
+      while (j < line.length && line[j] !== '`') {
+        if (line[j] === '\\' && j + 1 < line.length) {
+          buf += line[j] + line[j + 1];
+          j += 2;
+        } else if (line[j] === '$' && line[j + 1] === '{') {
+          if (buf) tokens.push({ type: 'string', text: buf });
+          buf = '';
+          tokens.push({ type: 'punct', text: '${' });
+          j += 2;
+          const exprStart = j;
+          let depth = 1;
+          while (j < line.length && depth > 0) {
+            if (line[j] === '{') depth++;
+            else if (line[j] === '}') {
+              depth--;
+              if (depth === 0) break;
+            }
+            j++;
+          }
+          for (const t of tokenizeTsLine(line.slice(exprStart, j))) tokens.push(t);
+          if (j < line.length) {
+            tokens.push({ type: 'punct', text: '}' });
+            j++;
+          }
+        } else {
+          buf += line[j];
+          j++;
+        }
+      }
+      if (j < line.length) buf += '`';
+      if (buf) tokens.push({ type: 'string', text: buf });
+      i = Math.min(j + 1, line.length);
+      continue;
+    }
+
+    // Number
+    if (/[0-9]/.test(c)) {
+      let j = i;
+      while (j < line.length && /[0-9.]/.test(line[j])) j++;
+      tokens.push({ type: 'number', text: line.slice(i, j) });
+      i = j;
+      continue;
+    }
+
+    // Identifier / keyword / type / func
+    if (/[A-Za-z_$]/.test(c)) {
+      let j = i;
+      while (j < line.length && /[A-Za-z0-9_$]/.test(line[j])) j++;
+      const word = line.slice(i, j);
+      let type;
+      if (TS_KEYWORDS.has(word)) type = 'keyword';
+      else if (TS_TYPES.has(word)) type = 'type';
+      else if (/^[A-Z]/.test(word)) type = 'type';
+      else if (line[j] === '(') type = 'func';
+      else type = 'ident';
+      tokens.push({ type, text: word });
+      i = j;
+      continue;
+    }
+
+    // Whitespace run (preserved verbatim)
+    if (/\s/.test(c)) {
+      let j = i;
+      while (j < line.length && /\s/.test(line[j])) j++;
+      tokens.push({ type: 'punct', text: line.slice(i, j) });
+      i = j;
+      continue;
+    }
+
+    // Single punctuation char (operators, brackets, …)
+    tokens.push({ type: 'punct', text: c });
+    i++;
+  }
+  return tokens;
+}
+
+function codeRuns(code, fontSize) {
+  const lines = code.split('\n');
+  const runs = [];
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    const isLastLine = li === lines.length - 1;
+    if (line.length === 0) {
+      runs.push({ text: ' ', options: { color: SYN.punct, fontFace: FONT.mono, fontSize, breakLine: !isLastLine } });
+      continue;
+    }
+    const tokens = tokenizeTsLine(line);
+    for (let ti = 0; ti < tokens.length; ti++) {
+      const tok = tokens[ti];
+      const isLastToken = ti === tokens.length - 1;
+      const opts = { color: SYN[tok.type] || SYN.punct, fontFace: FONT.mono, fontSize };
+      if (isLastToken && !isLastLine) opts.breakLine = true;
+      runs.push({ text: tok.text, options: opts });
+    }
+  }
+  return runs;
+}
+
 // ---------- SLIDE BUILDER ----------
 const pptx = new PptxGenJS();
 pptx.layout = 'LAYOUT_WIDE'; // 13.333 x 7.5
@@ -134,11 +297,11 @@ function addCode(slide, code, x, y, w, h, fontSize = 13) {
     line: { color: C.rule, width: 0.75 },
     rectRadius: 0.08,
   });
-  slide.addText(code, {
+  slide.addText(codeRuns(code, fontSize), {
     x: x + 0.18, y: y + 0.12, w: w - 0.36, h: h - 0.24,
     fontFace: FONT.mono,
     fontSize,
-    color: C.ink,
+    color: SYN.punct,
     valign: 'top',
     paraSpaceAfter: 0,
   });
@@ -329,6 +492,60 @@ function addNotes(slide, notes) {
   s.addText('▶ Demo 1', { x: 11.0, y: 6.55, w: 1.83, h: 0.35, fontFace: FONT.body, fontSize: 12, bold: true, color: C.cyan, align: 'right' });
 }
 
+// SLIDE 6a — SPFx + SP REST: add (bonus / flex)
+{
+  const s = pptx.addSlide({ masterName: 'SPACE_BASE' });
+  addTitle(s, 'SPFx + SP REST: add');
+  addSubtitle(s, 'Bonus — the cleanest verb in the SP REST set');
+
+  addCode(s,
+`public async createItem(list, item): Promise<IEventItem> {
+  const url = \`\${this.siteUrl}/_api/web/lists/getbytitle('\${list.title}')/items\`;
+  const options = { body: JSON.stringify(toSpWritePayload(item)) };
+  const response = await this.spHttpClient.post(url, SPHttpClient.configurations.v1, options);
+  if (!response.ok) throw new Error(\`Failed to create item: \${response.statusText}\`);
+  return await response.json() as IEventItem;
+}`,
+    0.5, 1.9, 12.33, 2.6, 14);
+
+  s.addText('A real POST to the list endpoint. No IF-MATCH. No X-HTTP-Method override. The body is just your fields.',
+    { x: 0.5, y: 4.7, w: 12.33, h: 0.5, fontFace: FONT.body, fontSize: 16, color: C.ink });
+
+  // Aside about ListItemEntityTypeFullName
+  s.addShape('rect', { x: 0.5, y: 5.45, w: 0.06, h: 1.1, fill: { color: C.amber }, line: { color: C.amber, width: 0 } });
+  s.addText([
+    { text: 'And no, you don\'t need ListItemEntityTypeFullName.', options: { color: C.amber, fontSize: 14, bold: true, italic: true, breakLine: true } },
+    { text: 'That was an odata=verbose thing. SPFx defaults to nometadata, so the body is just your fields.', options: { color: C.inkDim, fontSize: 13, italic: true } },
+  ], { x: 0.75, y: 5.45, w: 12.0, h: 1.1, fontFace: FONT.body, valign: 'middle', paraSpaceAfter: 2 });
+
+  addNotes(s, 'Bonus / flex slide. Pre-empt the audience question: "Don\'t I need to send __metadata: { type: \'SP.Data.…ListItem\' } on create?" Only under odata=verbose. SPFx ships nometadata by default; PnPjs .items.add() doesn\'t include it either. Multi-content-type lists are the one edge case, and there the modern fix is setting ContentTypeId in the payload, not __metadata.');
+}
+
+// SLIDE 6b — SPFx + SP REST: delete (bonus / flex)
+{
+  const s = pptx.addSlide({ masterName: 'SPACE_BASE' });
+  addTitle(s, 'SPFx + SP REST: delete');
+  addSubtitle(s, 'Bonus — another POST in disguise');
+
+  addCode(s,
+`public async deleteItem(list, itemId): Promise<void> {
+  const url = \`\${this.siteUrl}/_api/web/lists/getbytitle('\${list.title}')/items(\${itemId})\`;
+  const options = { headers: { 'IF-MATCH': '*', 'X-HTTP-Method': 'DELETE' } };
+  const response = await this.spHttpClient.post(url, SPHttpClient.configurations.v1, options);
+  if (!response.ok) throw new Error(\`Failed to delete item \${itemId}: \${response.statusText}\`);
+}`,
+    0.5, 1.9, 12.33, 2.6, 14);
+
+  s.addText('Note the ceremony', { x: 0.5, y: 4.7, w: 12.33, h: 0.4, fontFace: FONT.body, fontSize: 14, bold: true, color: C.amber });
+  s.addText([
+    bullet('It is a POST. The only thing that turns it into a delete is X-HTTP-Method: DELETE in the headers.', { fontSize: 14 }),
+    bullet("Same IF-MATCH: '*' opt-out as update.", { fontSize: 14 }),
+    bullet('Why isn\'t this spHttpClient.delete()? Because the SP REST endpoint expects POST with the override header. SPFx mirrors what the wire wants.', { fontSize: 14 }),
+  ], { x: 0.5, y: 5.05, w: 12.33, h: 1.7, fontFace: FONT.body, fontSize: 14, color: C.ink, valign: 'top', paraSpaceAfter: 4 });
+
+  addNotes(s, 'Bonus / flex slide. The pattern here is the same as update — POST + header override is the SP REST way of expressing every non-GET, non-create verb.');
+}
+
 // SLIDE — When SP REST stops being enough
 {
   const s = pptx.addSlide({ masterName: 'SPACE_BASE' });
@@ -371,6 +588,63 @@ const response = await this.graphClient
   ], { x: 0.5, y: 5.4, w: 12.33, h: 1.3, fontFace: FONT.body, fontSize: 14, color: C.ink, valign: 'top', paraSpaceAfter: 4 });
 
   addNotes(s, 'The Prefer header is a fallback for non-indexed columns — unreliable. Indexing is the real fix. "If you\'ve never seen these errors, that\'s because you\'ve been using PnPjs and you didn\'t know it was hiding them."');
+}
+
+// SLIDE 8a — SPFx + Graph: add (bonus / flex)
+{
+  const s = pptx.addSlide({ masterName: 'SPACE_BASE' });
+  addTitle(s, 'SPFx + Graph: add');
+  addSubtitle(s, 'Bonus — a real POST, plus the fields envelope');
+
+  addCode(s,
+`public async createItem(list, item): Promise<IEventItem> {
+  const response = await this.graphClient
+    .api(\`/sites/\${this.siteId}/lists/\${list.id}/items\`)
+    .version('v1.0')
+    .post({ fields: toGraphWriteFields(item) });
+  return fromGraphItem(response as IGraphListItem);
+}`,
+    0.5, 1.9, 12.33, 2.4, 14);
+
+  s.addText('A real .post() — no method-override gymnastics, no IF-MATCH.',
+    { x: 0.5, y: 4.5, w: 12.33, h: 0.5, fontFace: FONT.body, fontSize: 16, color: C.good });
+
+  s.addText('But the { fields: … } envelope is mandatory', { x: 0.5, y: 5.1, w: 12.33, h: 0.4, fontFace: FONT.body, fontSize: 14, bold: true, color: C.amber });
+  s.addText([
+    bullet('Graph won\'t accept a flat field bag — it wants the wrapper.', { fontSize: 13 }),
+    bullet('toGraphWriteFields does the same translations as the SP REST mapper (Speaker → SpeakerLookupId, URL → { Url, Description }).', { fontSize: 13 }),
+    bullet('Mapping ceremony is a SharePoint shape problem, not an HTTP-client problem.', { fontSize: 13 }),
+  ], { x: 0.5, y: 5.45, w: 12.33, h: 1.4, fontFace: FONT.body, fontSize: 13, color: C.ink, valign: 'top', paraSpaceAfter: 4 });
+
+  addNotes(s, 'Bonus / flex slide. The honesty beat: Graph\'s verbs are nicer than SP REST\'s, but the field-shape mapping is unchanged.');
+}
+
+// SLIDE 8b — SPFx + Graph: delete (bonus / flex)
+{
+  const s = pptx.addSlide({ masterName: 'SPACE_BASE' });
+  addTitle(s, 'SPFx + Graph: delete');
+  addSubtitle(s, 'Bonus — the cleanest delete in the deck');
+
+  addCode(s,
+`public async deleteItem(list, itemId): Promise<void> {
+  await this.graphClient
+    .api(\`/sites/\${this.siteId}/lists/\${list.id}/items/\${itemId}\`)
+    .version('v1.0')
+    .delete();
+}`,
+    0.5, 1.9, 12.33, 1.9, 14);
+
+  s.addText('A real .delete(). No POST. No X-HTTP-Method. No IF-MATCH.',
+    { x: 0.5, y: 4.0, w: 12.33, h: 0.5, fontFace: FONT.body, fontSize: 16, bold: true, color: C.good });
+
+  // Pull-quote
+  s.addShape('rect', { x: 0.5, y: 4.85, w: 0.06, h: 1.1, fill: { color: C.cyan }, line: { color: C.cyan, width: 0 } });
+  s.addText([
+    { text: 'The SP REST workaround is REST-the-protocol\'s fault,', options: { color: C.ink, fontSize: 18, italic: true, breakLine: true } },
+    { text: 'not Graph\'s.', options: { color: C.cyan, fontSize: 18, italic: true, bold: true } },
+  ], { x: 0.75, y: 4.85, w: 12.0, h: 1.1, fontFace: FONT.body, valign: 'middle', paraSpaceAfter: 2 });
+
+  addNotes(s, 'Bonus / flex slide. If asked about soft-delete vs hard-delete: Graph deletes are hard. If you want recycle-bin behavior, SP REST has recycle() — Graph does not.');
 }
 
 // SLIDE — Graph Explorer detour
@@ -571,6 +845,81 @@ const graph = graphfi().using(graphSPFx(this.context));`,
 
   s.addText('Same toSpWritePayload mapper — that\'s a SharePoint shape problem, not an HTTP-client problem.',
     { x: 0.5, y: 6.45, w: 12.33, h: 0.5, fontFace: FONT.body, fontSize: 13, color: C.inkDim, italic: true });
+}
+
+// SLIDE 15a — PnPjs: add (bonus / flex)
+{
+  const s = pptx.addSlide({ masterName: 'SPACE_BASE' });
+  addTitle(s, 'PnPjs: add');
+  addSubtitle(s, 'Bonus — same .add() across SP and Graph');
+
+  // Two columns: SP on left, Graph on right
+  s.addText('PnPjs SP', { x: 0.5, y: 1.85, w: 6.0, h: 0.3, fontFace: FONT.body, fontSize: 14, bold: true, color: C.cyan });
+  addCode(s,
+`const result = await this.sp.web.lists
+  .getByTitle(list.title)
+  .items
+  .add(toSpWritePayload(item));`,
+    0.5, 2.2, 6.16, 2.2, 12);
+
+  s.addText('PnPjs Graph', { x: 6.83, y: 1.85, w: 6.0, h: 0.3, fontFace: FONT.body, fontSize: 14, bold: true, color: C.violet });
+  addCode(s,
+`await this.graph.sites
+  .getById(this.siteId)
+  .lists.getById(list.id)
+  .items
+  .add({ fields: toGraphWriteFields(item) });`,
+    6.83, 2.2, 6.0, 2.2, 12);
+
+  // Pull quote
+  s.addShape('rect', { x: 0.5, y: 4.7, w: 0.06, h: 1.4, fill: { color: C.cyan }, line: { color: C.cyan, width: 0 } });
+  s.addText([
+    { text: 'Same .add() verb across both APIs.', options: { color: C.ink, fontSize: 20, bold: true, breakLine: true } },
+    { text: ' ', options: { fontSize: 8, breakLine: true } },
+    { text: 'The only difference is the path-builder chain — and that\'s the API surface, not the HTTP layer.', options: { color: C.cyan, fontSize: 14, italic: true } },
+  ], { x: 0.75, y: 4.7, w: 12.0, h: 1.4, fontFace: FONT.body, valign: 'middle', paraSpaceAfter: 4 });
+
+  s.addText('Note: the Graph version still needs the { fields: … } envelope — PnPjs hides transport ceremony, not API shape.',
+    { x: 0.5, y: 6.3, w: 12.33, h: 0.5, fontFace: FONT.body, fontSize: 12, color: C.inkDim, italic: true });
+
+  addNotes(s, 'Bonus / flex slide. Pairs with 6a and 8a for the "compare add across all three" beat.');
+}
+
+// SLIDE 15b — PnPjs: delete (bonus / flex)
+{
+  const s = pptx.addSlide({ masterName: 'SPACE_BASE' });
+  addTitle(s, 'PnPjs: delete');
+  addSubtitle(s, 'Bonus — same .delete() across SP and Graph');
+
+  s.addText('PnPjs SP', { x: 0.5, y: 1.85, w: 6.0, h: 0.3, fontFace: FONT.body, fontSize: 14, bold: true, color: C.cyan });
+  addCode(s,
+`await this.sp.web.lists
+  .getByTitle(list.title)
+  .items
+  .getById(itemId)
+  .delete();`,
+    0.5, 2.2, 6.16, 2.2, 12);
+
+  s.addText('PnPjs Graph', { x: 6.83, y: 1.85, w: 6.0, h: 0.3, fontFace: FONT.body, fontSize: 14, bold: true, color: C.violet });
+  addCode(s,
+`await this.graph.sites
+  .getById(this.siteId)
+  .lists.getById(list.id)
+  .items
+  .getById(itemId.toString())
+  .delete();`,
+    6.83, 2.2, 6.0, 2.2, 12);
+
+  // Pull quote
+  s.addShape('rect', { x: 0.5, y: 4.7, w: 0.06, h: 1.6, fill: { color: C.cyan }, line: { color: C.cyan, width: 0 } });
+  s.addText([
+    { text: 'No URLs. No IF-MATCH. No X-HTTP-Method.', options: { color: C.ink, fontSize: 20, bold: true, breakLine: true } },
+    { text: ' ', options: { fontSize: 8, breakLine: true } },
+    { text: 'PnPjs normalizes the verb across SP REST (which fakes DELETE via POST)', options: { color: C.cyan, fontSize: 14, italic: true, breakLine: true } },
+    { text: 'and Graph (which uses real DELETE). Same call site, different wire format.', options: { color: C.cyan, fontSize: 14, italic: true } },
+  ], { x: 0.75, y: 4.7, w: 12.0, h: 1.6, fontFace: FONT.body, valign: 'middle', paraSpaceAfter: 4 });
+
+  addNotes(s, 'Bonus / flex slide. Tease back to 6b and 8b: "Remember the SP REST X-HTTP-Method: DELETE trick? PnPjs handles that for you. The Graph version drops to a real DELETE underneath."');
 }
 
 // SLIDE — PnPjs + Graph: same operations
