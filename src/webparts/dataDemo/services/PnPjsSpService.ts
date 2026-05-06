@@ -19,7 +19,7 @@ export class PnPjsSpService implements ISpService {
   public async getItems(list: IListIdentifier): Promise<IEventItem[]> {
     const filter = `SessionDate ge datetime'${startOfTodayIso()}'`;
 
-    // * Single-call version (comment out to use the batched block):
+    //* Single-call version (comment out to use the batched block):
     return await this.sp.web.lists
       .getByTitle(list.title)
       .items

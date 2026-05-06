@@ -25,9 +25,6 @@ The deck (`data.pptx`) leads with Anonymous in both passes — Demo 1 is the Jok
 - [ ] `heft start` running, web part loaded in workbench or hosted page
 - [ ] Network tab open in DevTools, filter set to `XHR/Fetch`
 - [ ] Console tab cleared
-- [ ] **Endpoint Pivot defaults to Anonymous** (matches deck flow — verify, don't assume)
-- [ ] Speaking Events list seeded with ~10 items (mix of dates, some past, some future)
-- [ ] At least one test item you're willing to delete during the demo
 - [ ] VS Code open, side-by-side with browser, with the six service files in tabs:
   - `SpfxAnonymousService.ts`
   - `SpfxSpService.ts`
@@ -44,19 +41,29 @@ The deck (`data.pptx`) leads with Anonymous in both passes — Demo 1 is the Jok
 
 ---
 
-## Demo 1 — SPFx + anonymous: the Joke panel
+## Demo 1 - Project setup and architecture tour
+**Goal:** orient the audience to the codebase, show the service factory pattern, and set the stage for the SPFx + Anonymous demo.
+
+**Slide cue:** Slide 13.
+**Time budget:** 3 min.
+**Steps:**
+1. [Desktop 4] Show home page of PDS Labs. Explain the final product is not what we are building today.
+2. Go to the List tab for Speaking Events.
+3. [Desktop 3]Switch to Debug browser with DevTools open. 
+4. [Desktop 2] Show the codebase in VS Code. Show models and services folders.
+
+## Demo 2 — SPFx + anonymous: the Joke panel
 
 **Goal:** open the talk with the simplest HTTP client. Show that `HttpClient` is just plain fetch with a friendlier API. Set the rhythm of "click a tab, watch the network."
 
 **Slide cue:** Slide 14.
-
 **Time budget:** 3 min.
 
 **Steps:**
 
-1. **Set the Pivot tabs.** Click *SPFx* → *Anonymous*.
-2. **Open VS Code to `SpfxAnonymousService.ts`.** Show all ~30 lines on screen.
+1. [Desktop 2] **Open VS Code to `SpfxAnonymousService.ts`.** Show all ~30 lines on screen.
    - **Say:** "That's the whole service. Three lines of HTTP, two lines of mapping. No auth. No headers. This is the simplest of the three SPFx clients, so it's where we'll start."
+2. [Desktop 3]**Set the Pivot tabs.** Click *SPFx* → *Anonymous*.
 3. **Browser, click Get Joke.**
 4. **Show the network request.** Point at the URL — `official-joke-api.appspot.com`. Not SharePoint. Not Graph. Just plain HTTPS.
 5. **Wait for the punchline reveal.** (Use it as a beat — laughter buys you setup time.)
@@ -65,12 +72,9 @@ The deck (`data.pptx`) leads with Anonymous in both passes — Demo 1 is the Jok
 **Why this matters:**
 - **Say:** "Most SPFx tutorials forget this client exists. If you ever need to call a public weather API, a sports scores API, anything not in your tenant — `HttpClient` is the answer. Same `@microsoft/sp-http` package, no auth, you're done. Now let's add some auth and see how it gets messier."
 
-**Recovery moves:**
-- If the Joke API is down: this is the opener — pivot fast. "The API's down, which is why we don't write production code against random public services without a fallback." Skip to Demo 2 (SP REST). Re-thread the Anonymous beat verbally on the way to slide 15.
-
 ---
 
-## Demo 2 — SPFx + SP REST: read, update, add, delete
+## Demo 3 — SPFx + SP REST: read, update, add, delete
 
 **Goal:** show the URL the SPFx code builds, the headers a write requires, and the ceremony around update/delete.
 
@@ -80,19 +84,18 @@ The deck (`data.pptx`) leads with Anonymous in both passes — Demo 1 is the Jok
 
 **Steps:**
 
-1. **Set the Pivot tabs.** Click *SPFx* → *SharePoint*.
-2. **Open VS Code to `SpfxSpService.ts`.** Highlight lines 17–22 (the URL builder).
+1. **Open VS Code to `SpfxSpService.ts`.** Highlight lines 17–22 (the URL builder).
    - **Say:** "This is the URL we're sending. Memorize the shape — `$select`, `$expand`, `$filter`, `$orderby`. We'll come back to it after the pivot."
-3. **Switch to browser, Network tab.** Click the **Refresh** / **Load** button on the web part.
-4. **Click the request in Network.** Show the URL. Show that it matches the slide.
-5. **Show the response.** Point at `value: [...]` and the field shape. Note `Speaker` is an array of `{ Id, Title, EMail }` because we expanded it.
-6. **Click Add Event.** Fill in: Title = "Demo Event", SessionDate = a future date, SessionType = "60 minute session", Speaker = yourself.
-7. **Click Save.** Find the POST in Network. Show the body — just your fields. (Slide 18 is the matching code if you want to flip to it.)
+2. **Switch to browser, Network tab.** Click the **Refresh** / **Load** button on the web part.
+3. **Click the request in Network.** Show the URL. Show that it matches the slide.
+4. **Show the response.** Point at `value: [...]` and the field shape. Note `Speaker` is an array of `{ Id, Title, EMail }` because we expanded it.
+5. **Click Add Event.** Fill in: Title = "Demo Event", SessionDate = a future date, SessionType = "60 minute session", Speaker = yourself.
+6. **Click Save.** Find the POST in Network. Show the body — just your fields. (Slide 18 is the matching code if you want to flip to it.)
    - **Say:** "Add is the cleanest verb in SP REST. A real POST. No header gymnastics yet."
-8. **Click Edit on the new item.** Change the title. Save.
-9. **Show the update request.** Point at `IF-MATCH: *` and `X-HTTP-Method: MERGE` in request headers.
+7. **Click Edit on the new item.** Change the title. Save.
+8. **Show the update request.** Point at `IF-MATCH: *` and `X-HTTP-Method: MERGE` in request headers.
    - **Say:** "It's a POST that says 'I'm actually a MERGE.' That's how SharePoint REST does PATCH. The SPFx client doesn't hide that from you — slide 17 has the code."
-10. **(Bonus, if time)** Click Delete on a test item. Show the network request — another POST, this time with `X-HTTP-Method: DELETE`. Slide 19 has the code.
+9.  **(Bonus, if time)** Click Delete on a test item. Show the network request — another POST, this time with `X-HTTP-Method: DELETE`. Slide 19 has the code.
     - **Say:** "Delete is *another* POST. The SP REST endpoint expects POST + override header for everything that isn't GET or create. Three of the four CRUD verbs go through POST."
 
 **Recovery moves:**
@@ -101,7 +104,7 @@ The deck (`data.pptx`) leads with Anonymous in both passes — Demo 1 is the Jok
 
 ---
 
-## Demo 3 — SPFx + Graph: read, then Graph Explorer (and bonus add/delete)
+## Demo 4 — SPFx + Graph: read, then Graph Explorer (and bonus add/delete)
 
 **Goal:** show the Graph URL is *different* from the SP REST URL, demonstrate the gotchas, then use the Graph Explorer detour as a tool you'd actually reach for in real life.
 
@@ -111,12 +114,12 @@ The deck (`data.pptx`) leads with Anonymous in both passes — Demo 1 is the Jok
 
 **Steps:**
 
-1. **Click Pivot to *SPFx* → *MS Graph (SP)*.**
-2. **Open VS Code to `SpfxGraphSpService.ts`.** Highlight lines 22–32.
+1. **Open VS Code to `SpfxGraphSpService.ts`.** Highlight lines 22–32.
    - **Point at line 23:** "`expand=fields(select=...)`. **No dollar sign on expand.** If you put `$expand` here, you get an OData parser error. I learned this the hard way."
    - **Point at line 24:** "Datetime literal. Single-quoted ISO string. The legacy `datetime'...'` wrapper from SP REST? Returns a 400 here."
    - **Point at line 30:** "This `Prefer` header is a fallback for non-indexed columns. **Do not rely on it.** Index your filter and sort columns. The header just delays the failure."
-3. **Browser, Network tab, click Load.**
+2. **Browser, Network tab, click Load.**
+3. **Click Pivot to *SPFx* → *MS Graph (SP)*.**
 4. **Click the request.** URL is now `graph.microsoft.com/v1.0/sites/{id}/lists/{id}/items`. Different host, different shape.
 5. **Show the response.** Point at the nested `fields` object — every column is inside `fields`, not on the root. Hyperlink fields are `{ Description, Url }` objects.
    - **Say:** "Every Graph response for a list item is wrapped in `fields`. Your mapper has to unwrap it. That's why we have a separate `graphMappers.ts`."
