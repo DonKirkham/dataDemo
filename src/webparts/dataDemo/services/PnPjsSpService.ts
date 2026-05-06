@@ -20,7 +20,8 @@ export class PnPjsSpService implements ISpService {
     const filter = `SessionDate ge datetime'${startOfTodayIso()}'`;
 
     //* Single-call version (comment out to use the batched block):
-    return await this.sp.web.lists
+    return await this.sp
+      .web.lists
       .getByTitle(list.title)
       .items
       //.using(CacheNever()) // comment out to allow caching for this call

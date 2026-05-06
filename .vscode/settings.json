@@ -10,5 +10,16 @@
     "**/lib-amd": true,
     "src/**/*.scss.ts": true
   },
-  "typescript.tsdk": ".\\node_modules\\typescript\\lib"
+  "typescript.tsdk": ".\\node_modules\\typescript\\lib",
+
+  // --- PRESENTATION MODE: silence AI helpers, keep TypeScript IntelliSense ---
+  // Remove this block after the talk to restore Copilot/inline suggestions.
+  // IntelliSense (the fluent-API dropdown on `.`) is left ON — it's the demo.
+  "editor.inlineSuggest.enabled": false,
+  "editor.wordBasedSuggestions": "off",
+  "editor.snippetSuggestions": "none",
+  "github.copilot.enable": { "*": false },
+  "github.copilot.nextEditSuggestions.enabled": false,
+  "github.copilot.editor.enableAutoCompletions": false
+  // --- END PRESENTATION MODE ---
 }
