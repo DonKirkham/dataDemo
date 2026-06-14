@@ -220,7 +220,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
     Logger.debug(`init effect: site=${site?.id ?? 'none'}, list=${list?.id ?? 'none'}, transport=${transport}, endpoint=${endpoint}`);
     initServiceAndLoad(transport, endpoint, factory, site, list)
       .catch(() => { /* handled internally */ });
-  }, [factory, site?.id, list?.id, transport, endpoint]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [factory, site?.id, list?.id, transport, endpoint]);
 
   const onAddItem = React.useCallback((): void => {
     setShowDialog(true);

@@ -1,0 +1,5 @@
+allowBuilds:
+  '@pnp/spfx-controls-react': true
+  '@pnp/spfx-property-controls': true
+  swiper: true
+  unrs-resolver: true

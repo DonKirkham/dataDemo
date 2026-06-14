@@ -19,13 +19,15 @@ function bindIfActive(consoleFn: (...args: unknown[]) => void, level: LogLevel):
 }
 
 function rebind(): void {
-  /* eslint-disable no-console */
+  // Logger is declared below; rebind() only runs after that initializer, so the
+  // forward reference is safe. Silence the rule for this intentional pattern.
+  /* eslint-disable @typescript-eslint/no-use-before-define */
   Logger.info  = bindIfActive(console.info,  LogLevel.Info);
   Logger.debug = bindIfActive(console.debug, LogLevel.Verbose);
   Logger.warn  = bindIfActive(console.warn,  LogLevel.Warning);
   Logger.error = bindIfActive(console.error, LogLevel.Error);
-  /* eslint-enable no-console */
   Logger.log   = Logger.info;
+  /* eslint-enable @typescript-eslint/no-use-before-define */
 }
 
 interface ILogger {
