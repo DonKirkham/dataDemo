@@ -371,19 +371,19 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
           </MessageBar>
         )}
 
-        <h2 className={styles.viewHeading} data-automation-id="dataDemo-heading-view">Upcoming Events</h2>
-
-        <Stack horizontal tokens={stackTokens}>
+        <Stack horizontal tokens={stackTokens} horizontalAlign="center">
           <PrimaryButton
             text="Add Item"
             iconProps={{ iconName: 'Add' }}
             onClick={onAddItem}
+            className={styles.addButton}
             data-automation-id="dataDemo-button-add"
           />
           <DefaultButton
             text="Refresh"
             iconProps={{ iconName: 'Refresh' }}
             onClick={() => loadItems(spService, list)}
+            className={styles.refreshButton}
             data-automation-id="dataDemo-button-refresh"
           />
         </Stack>
@@ -507,20 +507,23 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   };
 
   return (
-    <div className={styles.dataDemo} data-automation-id="dataDemo-container-root">
+    <div
+      className={`${styles.dataDemo} ${transport === 'SPFx' ? styles.transportSpfxActive : styles.transportPnpjsActive}`}
+      data-automation-id="dataDemo-container-root"
+    >
       <Stack tokens={stackTokens}>
-        <div className={styles.pivotWrapper}>
+        <div className={`${styles.pivotWrapper} ${styles.transportPivot}`}>
           <Pivot
             selectedKey={transport}
             onLinkClick={onTransportChanged}
             data-automation-id="dataDemo-pivot-transport"
           >
-            <PivotItem headerText="SPFx" itemKey="SPFx" />
-            <PivotItem headerText="PnPjs" itemKey="PnPjs" />
+            <PivotItem headerText="SPFx" itemKey="SPFx" headerButtonProps={{ 'data-tab': 'spfx' }} />
+            <PivotItem headerText="PnPjs" itemKey="PnPjs" headerButtonProps={{ 'data-tab': 'pnpjs' }} />
           </Pivot>
         </div>
 
-        <div className={styles.pivotWrapper}>
+        <div className={`${styles.pivotWrapper} ${styles.endpointPivot}`}>
           <Pivot
             selectedKey={endpoint}
             onLinkClick={onEndpointChanged}
@@ -535,14 +538,16 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
           </Pivot>
         </div>
 
-        {PLACEHOLDER_ENDPOINTS.indexOf(endpoint) >= 0
-          ? renderPlaceholder()
-          : endpoint === 'MS Graph (Explorer)' && graphQueryService
-            ? <GraphExplorer service={graphQueryService} />
-            : isAnonymous && jokeService
-              ? <JokePanel service={jokeService} />
-              : renderCrudPanel()
-        }
+        <div className={styles.output}>
+          {PLACEHOLDER_ENDPOINTS.indexOf(endpoint) >= 0
+            ? renderPlaceholder()
+            : endpoint === 'MS Graph (Explorer)' && graphQueryService
+              ? <GraphExplorer service={graphQueryService} />
+              : isAnonymous && jokeService
+                ? <JokePanel service={jokeService} />
+                : renderCrudPanel()
+          }
+        </div>
       </Stack>
     </div>
   );

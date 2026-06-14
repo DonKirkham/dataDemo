@@ -9,13 +9,26 @@
   color: "[theme:bodyText, default: #323130]";
   color: var(--bodyText);
 
+  // Accent driven by the selected first-tier transport. Inherited by the second
+  // tier and the output region so they reflect SPFx (blue) vs PnPjs (darkred).
+  --demo-accent: blue;
+
+  &.transportSpfxActive {
+    --demo-accent: blue;
+  }
+
+  &.transportPnpjsActive {
+    --demo-accent: darkred;
+  }
+
   .pivotWrapper {
     display: flex;
     justify-content: center;
 
     :global(.ms-Pivot-link) {
-      height: 22px;
-      line-height: 22px;
+      height: 32px;
+      line-height: 32px;
+      font-size: 20px;
     }
 
     :global(.ms-Pivot-link.is-selected) {
@@ -24,14 +37,90 @@
       border-radius: 4px 4px 0 0;
     }
   }
-}
 
-.viewHeading {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: "[theme:themePrimary, default: #0078d4]";
-  color: var(--themePrimary, #0078d4);
+  // First tier (transport). Inactive tabs use a faded fill of their color with
+  // full-color text; the active tab uses the full color with white text and a
+  // white selection underline.
+  .transportPivot {
+    // Inactive: faded background, full-color text.
+    :global(.ms-Pivot-link[data-tab='spfx']) {
+      color: blue;
+      background-color: rgba(0, 0, 255, 0.15);
+    }
+
+    :global(.ms-Pivot-link[data-tab='pnpjs']) {
+      color: darkred;
+      background-color: rgba(139, 0, 0, 0.15);
+    }
+
+    // Active: full-color background, white text.
+    :global(.ms-Pivot-link.is-selected[data-tab='spfx']) {
+      color: white;
+      background-color: blue;
+    }
+
+    :global(.ms-Pivot-link.is-selected[data-tab='pnpjs']) {
+      color: white;
+      background-color: darkred;
+    }
+
+    // Active: white selection underline (Fluent draws it via ::before).
+    :global(.ms-Pivot-link.is-selected[data-tab='spfx'])::before,
+    :global(.ms-Pivot-link.is-selected[data-tab='pnpjs'])::before {
+      background-color: white;
+    }
+  }
+
+  // Second tier (endpoint): text reflects the active transport.
+  .endpointPivot {
+    :global(.ms-Pivot-link),
+    :global(.ms-Pivot-link.is-selected) {
+      color: var(--demo-accent);
+      font-size: 17px;
+    }
+  }
+
+  // Output region: text reflects the active transport.
+  .output {
+    color: var(--demo-accent);
+
+    // DetailsList column header labels follow the transport accent.
+    :global(.ms-DetailsHeader-cellName) {
+      color: var(--demo-accent);
+    }
+
+    // In-row action icons (Edit/Delete) follow the accent. Scoped to the
+    // DetailsList so the Add/Refresh toolbar buttons above it are unaffected.
+    :global(.ms-DetailsList .ms-Button-icon) {
+      color: var(--demo-accent);
+    }
+
+    // Add Item button takes the active transport accent as its fill.
+    .addButton {
+      &,
+      &:hover,
+      &:active {
+        background-color: var(--demo-accent);
+        border-color: var(--demo-accent);
+        color: white;
+      }
+    }
+
+    // Refresh button: accent text, icon, and border on a default (unfilled) button.
+    .refreshButton {
+      &,
+      &:hover,
+      &:active {
+        border-color: var(--demo-accent);
+        color: var(--demo-accent);
+      }
+
+      :global(.ms-Button-label),
+      :global(.ms-Button-icon) {
+        color: var(--demo-accent);
+      }
+    }
+  }
 }
 
 .graphJson,
