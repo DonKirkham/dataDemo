@@ -19,11 +19,11 @@
   "preconfiguredEntries": [{
     "groupId": "5c03119e-3074-46fd-976b-c60198311f70", // Advanced
     "group": { "default": "Advanced" },
-    "title": { "default": "DataDemo" },
-    "description": { "default": "DataDemo description" },
-    "officeFabricIconFontName": "Page",
+    "title": { "default": "Data Demo" },
+    "description": { "default": "Webpart for Data Session" },
+    "officeFabricIconFontName": "Calendar",
     "properties": {
-      "description": "DataDemo"
+      "advancedLogging": true
     }
   }]
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
   "solution": {
-    "name": "data-client-side-solution",
+    "name": "data-demo-solution",
     "id": "31ec5f5d-de3a-4f18-b27c-5f26d6f6e646",
     "version": "1.0.0.0",
     "includeClientSideAssets": true,
@@ -33,14 +33,14 @@
     },
     "features": [
       {
-        "title": "data Feature",
-        "description": "The feature that activates elements of the data solution.",
+        "title": "Data Demo Feature",
+        "description": "The feature that activates elements of the data demo solution.",
         "id": "5a892242-de43-47e6-a823-2baaa117e704",
         "version": "1.0.0.0"
       }
     ]
   },
   "paths": {
-    "zippedPackage": "solution/data.sppkg"
+    "zippedPackage": "solution/dataDemo.sppkg"
   }
 }
