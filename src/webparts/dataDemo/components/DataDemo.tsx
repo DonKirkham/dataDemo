@@ -331,8 +331,8 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
         onRender: (item: IEventItem) =>
           item.SessionDate ? new Date(item.SessionDate).toLocaleDateString() : ''
       },
-      { key: 'Title', name: 'Event', fieldName: 'Title', minWidth: 180, maxWidth: 360, isResizable: true, isMultiline: true },
-      { key: 'Session', name: 'Session', fieldName: 'Session', minWidth: 200, maxWidth: 400, isResizable: true, isMultiline: true },
+      { key: 'Title', name: 'Event', fieldName: 'Title', minWidth: 150, maxWidth: 200, isResizable: true, isMultiline: true },
+      { key: 'Session', name: 'Session', fieldName: 'Session', minWidth: 320, maxWidth: 600, isResizable: true, isMultiline: true },
       { key: 'SessionType', name: 'Type', fieldName: 'SessionType', minWidth: 90, maxWidth: 130, isResizable: true, isMultiline: true },
       {
         key: 'Speaker',
