@@ -102,7 +102,8 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   const [endpoint, setEndpoint] = React.useState<Endpoint>(() => {
     const q = readDemoQueryParams();
     const t = q.transport ?? 'SPFx';
-    const e = q.endpoint ?? 'SharePoint';
+    // No query params → default to the SPFx Anonymous demo.
+    const e = q.endpoint ?? 'Anonymous';
     // The free-form Graph endpoint is SPFx-only; fall back if the URL combo is invalid.
     return e === 'MS Graph (Explorer)' && t !== 'SPFx' ? 'SharePoint' : e;
   });
@@ -336,25 +337,32 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   };
 
   const renderCrudPanel = (): React.ReactElement => {
-    if (!spService || !list) {
-      return (
-        <Spinner size={SpinnerSize.large} label="Initializing..." data-automation-id="dataDemo-spinner-init" />
-      );
-    }
-
-    // On the user-identity endpoints, wait until the user's list permissions are
-    // known, then block the whole panel if they can't read the list.
-    if (!isElevated && !permissionsLoaded) {
-      return (
-        <Spinner size={SpinnerSize.large} label="Checking permissions..." className={styles.loadingSpinner} data-automation-id="dataDemo-spinner-permissions" />
-      );
-    }
-
-    if (!effectivePermissions.canRead) {
+    // No read access (user-identity tabs) → friendly message instead of the panel.
+    if (!isElevated && permissionsLoaded && !effectivePermissions.canRead) {
       return (
         <MessageBar messageBarType={MessageBarType.warning} data-automation-id="dataDemo-message-noaccess">
-          You don&rsquo;t have access to view <strong>{list.title}</strong>. Ask the site owner to grant
+          You don&rsquo;t have access to view <strong>{list?.title}</strong>. Ask the site owner to grant
           you at least Read permission on this list, then refresh the page.
+        </MessageBar>
+      );
+    }
+
+    // Everything that must be ready before the panel is revealed: the service,
+    // the list, the permission check (user-identity tabs), and the item load.
+    // A single "Loading..." message covers all of it so the buttons and table
+    // appear together, never staggered — unless an error needs to be shown.
+    const initializing = !spService || !list || (!isElevated && !permissionsLoaded);
+    if (!error && (initializing || loading)) {
+      return (
+        <Spinner size={SpinnerSize.large} label="Loading..." className={styles.loadingSpinner} data-automation-id="dataDemo-spinner-loading" />
+      );
+    }
+
+    // An error before the panel can render (e.g. the service failed to init).
+    if (!spService || !list) {
+      return (
+        <MessageBar messageBarType={MessageBarType.error} onDismiss={() => setError(undefined)} data-automation-id="dataDemo-message-error">
+          {error}
         </MessageBar>
       );
     }
@@ -455,17 +463,13 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
           />
         </Stack>
 
-        {loading ? (
-          <Spinner size={SpinnerSize.large} label="Loading items..." className={styles.loadingSpinner} data-automation-id="dataDemo-spinner-loading" />
-        ) : (
-          <DetailsList
-            items={items}
-            columns={columns}
-            layoutMode={DetailsListLayoutMode.justified}
-            selectionMode={SelectionMode.none}
-            data-automation-id="dataDemo-list-items"
-          />
-        )}
+        <DetailsList
+          items={items}
+          columns={columns}
+          layoutMode={DetailsListLayoutMode.justified}
+          selectionMode={SelectionMode.none}
+          data-automation-id="dataDemo-list-items"
+        />
 
         <Dialog
           hidden={!showDialog}
