@@ -8,7 +8,6 @@ import '@pnp/sp/lists';
 import '@pnp/sp/security';
 import { PermissionKind } from '@pnp/sp/security';
 import { graphfi, SPFx as graphSPFx } from '@pnp/graph';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Caching } from '@pnp/queryable';
 import { ISpService, IListIdentifier } from '../models/ISpService';
 import { IJokeService } from '../models/IJokeService';
@@ -31,6 +30,14 @@ export interface ISiteInfo {
   id: string;
 }
 
+// PnPjs-only feature toggles surfaced as checkboxes. `useCache` adds Caching to
+// the spfi/graphfi instance; `useBatching`/`batchSize` switch reads to $batch.
+export interface IPnPjsOptions {
+  useCache: boolean;
+  useBatching: boolean;
+  batchSize: number;
+}
+
 // Configuration for the elevated Azure Functions API (apiDemo). Public and
 // mutable so the web part can refresh it from the property pane between renders.
 export interface IApiConfig {
@@ -38,9 +45,8 @@ export interface IApiConfig {
   resourceUri: string;
 }
 
-// The signed-in user's effective permissions on the target list. Used to gate
-// the read/write UI on the user-identity endpoints (the elevated API endpoints
-// read/write app-only, so they ignore these).
+// The signed-in user's effective permissions on the target list. Gates the
+// read/write UI on user-identity endpoints (elevated endpoints ignore these).
 export interface IListPermissions {
   canRead: boolean;
   canAdd: boolean;
@@ -58,7 +64,12 @@ export class ServiceFactory {
     return this._context;
   }
 
-  public async createSpService(transport: Transport, endpoint: Endpoint, site: ISiteInfo): Promise<ISpService> {
+  public async createSpService(
+    transport: Transport,
+    endpoint: Endpoint,
+    site: ISiteInfo,
+    options?: IPnPjsOptions
+  ): Promise<ISpService> {
     if (transport === 'SPFx' && endpoint === 'SharePoint') {
       return new SpfxSpService(this.context.spHttpClient, site.url);
     }
@@ -69,22 +80,33 @@ export class ServiceFactory {
     }
 
     if (transport === 'PnPjs' && endpoint === 'SharePoint') {
-      const sp = spfi(site.url)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .using(spSPFx(this.context as any))
-        //.using(Caching({ store: 'session' })); // comment out to disable caching
-      return new PnPjsSpService(sp);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sp = spfi(site.url).using(spSPFx(this.context as any));
+      if (options?.useCache) {
+        // Caching co-exists with the normal read path — same fluent query, now
+        // served from sessionStorage on repeat calls.
+        sp.using(Caching({ store: 'session' }));
+      }
+      return new PnPjsSpService(sp, {
+        useBatching: options?.useBatching ?? false,
+        batchSize: options?.batchSize ?? 5
+      });
     }
 
     if (transport === 'PnPjs' && endpoint === 'MS Graph (SP)') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const graph = graphfi().using(graphSPFx(this.context as any));
-      return new PnPjsGraphSpService(graph, site.id);
+      if (options?.useCache) {
+        graph.using(Caching({ store: 'session' }));
+      }
+      return new PnPjsGraphSpService(graph, site.id, {
+        useBatching: options?.useBatching ?? false,
+        batchSize: options?.batchSize ?? 5
+      });
     }
 
-    // The elevated-API endpoints call the apiDemo Azure Function, which performs
-    // the SharePoint write app-only. They behave identically under either
-    // transport, so the transport pivot does not branch them.
+    // The elevated-API endpoints call the apiDemo Azure Function (write app-only).
+    // They behave identically under either transport, so we don't branch on it.
     if (endpoint === 'Simple Auth') {
       return new ApiDomainSpService(this.context.httpClient, this.api.baseUrl, site.url);
     }
@@ -97,9 +119,8 @@ export class ServiceFactory {
     throw new Error(`Unsupported SharePoint combination: ${transport} + ${endpoint}`);
   }
 
-  // Reads the signed-in user's effective permissions on the target list, once
-  // per site/list. Independent of the selected endpoint — it reflects what the
-  // *user* can do directly, which is what the user-identity tabs are gated on.
+  // Reads the signed-in user's effective list permissions, once per site/list.
+  // Reflects what the *user* can do directly — what the user-identity tabs gate on.
   public async getListPermissions(site: ISiteInfo, list: IListIdentifier): Promise<IListPermissions> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sp = spfi(site.url).using(spSPFx(this.context as any));

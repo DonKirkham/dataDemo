@@ -8,7 +8,7 @@ import { IEventItem, ISpeaker, SessionType } from '../models/IEventItem';
 import { ISpService } from '../models/ISpService';
 import { IJokeService } from '../models/IJokeService';
 import { IGraphQueryService } from '../models/IGraphQueryService';
-import { Transport, Endpoint, IListPermissions } from '../services/ServiceFactory';
+import { Transport, Endpoint, IListPermissions, IPnPjsOptions } from '../services/ServiceFactory';
 import JokePanel from './JokePanel';
 import GraphExplorer from './GraphExplorer';
 import { Logger } from '../utilities/logger';
@@ -34,7 +34,10 @@ import {
   PivotItem,
   DatePicker,
   Dropdown,
-  IDropdownOption
+  IDropdownOption,
+  Checkbox,
+  SpinButton,
+  Position
 } from '@fluentui/react';
 import { PeoplePicker, PrincipalType } from '@pnp/spfx-controls-react/lib/PeoplePicker';
 
@@ -113,8 +116,18 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   // The signed-in user's own permissions on the list (NO_PERMISSIONS until resolved).
   const [permissions, setPermissions] = React.useState<IListPermissions>(NO_PERMISSIONS);
   const [permissionsLoaded, setPermissionsLoaded] = React.useState(false);
+  // PnPjs-only capability toggles (caching + batching). Ignored by every other
+  // transport/endpoint; the checkboxes only render on the PnPjs data tabs.
+  const [useCache, setUseCache] = React.useState(false);
+  const [useBatching, setUseBatching] = React.useState(false);
+  const [batchSize, setBatchSize] = React.useState(5);
 
   const isAnonymous = endpoint === 'Anonymous';
+
+  // Caching/batching are PnPjs features and only meaningful on the two tabs that
+  // read SharePoint data via PnPjs (SharePoint REST + Graph).
+  const supportsPnpOptions =
+    transport === 'PnPjs' && (endpoint === 'SharePoint' || endpoint === 'MS Graph (SP)');
 
   // On the elevated-API tabs the Azure Function writes app-only, so the user's
   // own permissions don't apply — Add/Edit/Delete stay enabled. Everywhere else
@@ -140,7 +153,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   }, []);
 
   const initServiceAndLoad = React.useCallback(async (
-    t: Transport, ep: Endpoint, f: typeof factory, s: typeof site, l: typeof list
+    t: Transport, ep: Endpoint, f: typeof factory, s: typeof site, l: typeof list, opts: IPnPjsOptions
   ): Promise<void> => {
     const anon = ep === 'Anonymous';
     const graphQuery = ep === 'MS Graph (Explorer)';
@@ -174,7 +187,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
         setGraphQueryService(svc);
         setLoading(false);
       } else {
-        const svc = await f.createSpService(t, ep, s ?? { url: '', id: '' });
+        const svc = await f.createSpService(t, ep, s ?? { url: '', id: '' }, opts);
         setJokeService(undefined);
         setGraphQueryService(undefined);
         setSpService(svc);
@@ -264,10 +277,10 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
       Logger.debug(`endpoint ${endpoint} is a placeholder, skipping service init`);
       return;
     }
-    Logger.debug(`init effect: site=${site?.id ?? 'none'}, list=${list?.id ?? 'none'}, transport=${transport}, endpoint=${endpoint}`);
-    initServiceAndLoad(transport, endpoint, factory, site, list)
+    Logger.debug(`init effect: site=${site?.id ?? 'none'}, list=${list?.id ?? 'none'}, transport=${transport}, endpoint=${endpoint}, cache=${useCache}, batching=${useBatching}, batchSize=${batchSize}`);
+    initServiceAndLoad(transport, endpoint, factory, site, list, { useCache, useBatching, batchSize })
       .catch(() => { /* handled internally */ });
-  }, [factory, site?.id, list?.id, transport, endpoint]);
+  }, [factory, site?.id, list?.id, transport, endpoint, useCache, useBatching, batchSize]);
 
   const onAddItem = React.useCallback((): void => {
     setShowDialog(true);
@@ -611,6 +624,41 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
             <PivotItem headerText="Entra App" itemKey="Entra App" />
           </Pivot>
         </div>
+
+        {supportsPnpOptions && (
+          <div className={styles.pnpOptions} data-automation-id="dataDemo-pnp-options">
+            <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 24 }}>
+              <Checkbox
+                label="Use Cache"
+                checked={useCache}
+                onChange={(_e, checked) => setUseCache(!!checked)}
+                data-automation-id="dataDemo-checkbox-cache"
+              />
+              <Checkbox
+                label="Use Batching"
+                checked={useBatching}
+                onChange={(_e, checked) => setUseBatching(!!checked)}
+                data-automation-id="dataDemo-checkbox-batching"
+              />
+              {useBatching && (
+                <SpinButton
+                  label="Requests per $batch"
+                  labelPosition={Position.top}
+                  min={1}
+                  max={20}
+                  step={1}
+                  value={String(batchSize)}
+                  styles={{ root: { width: 150 } }}
+                  onChange={(_e, val) => {
+                    const n = parseInt(val ?? '', 10);
+                    if (!isNaN(n)) setBatchSize(Math.min(20, Math.max(1, n)));
+                  }}
+                  data-automation-id="dataDemo-spin-batchsize"
+                />
+              )}
+            </Stack>
+          </div>
+        )}
 
         <div className={styles.output}>
           {PLACEHOLDER_ENDPOINTS.indexOf(endpoint) >= 0

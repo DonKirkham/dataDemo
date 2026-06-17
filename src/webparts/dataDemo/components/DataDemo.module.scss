@@ -99,6 +99,25 @@
     }
   }
 
+  // PnPjs-only options row (Use Cache / Use Batching). Only renders on the PnPjs
+  // tabs, so it always shows the PnPjs accent; a faint fill sets it apart.
+  .pnpOptions {
+    padding: 8px 12px;
+    background-color: var(--demo-accent-faint);
+    border-radius: 4px;
+
+    :global(.ms-Checkbox-text),
+    :global(.ms-Label) {
+      color: var(--demo-accent);
+    }
+
+    // Checked box takes the accent fill/border.
+    :global(.ms-Checkbox.is-checked .ms-Checkbox-checkbox) {
+      background-color: var(--demo-accent);
+      border-color: var(--demo-accent);
+    }
+  }
+
   // Output region: text reflects the active transport.
   .output {
     color: var(--demo-accent);
