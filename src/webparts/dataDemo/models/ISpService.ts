@@ -14,10 +14,3 @@ export interface ISpService {
   updateItem(list: IListIdentifier, itemId: number, item: IEventItem): Promise<IEventItem>;
   deleteItem(list: IListIdentifier, itemId: number): Promise<void>;
 }
-
-// Batching options for the PnPjs services. `batchSize` maps to PnPjs's
-// `maxRequests` — the number of sub-requests grouped into each $batch HTTP call.
-export interface IPnPjsBatchOptions {
-  useBatching: boolean;
-  batchSize: number;
-}

@@ -30,12 +30,10 @@ export interface ISiteInfo {
   id: string;
 }
 
-// PnPjs-only feature toggles surfaced as checkboxes. `useCache` adds Caching to
-// the spfi/graphfi instance; `useBatching`/`batchSize` switch reads to $batch.
+// PnPjs-only options. `useCache` adds the Caching behavior to the spfi/graphfi
+// instance. (Batching is exercised on demand via the services' runBatchDemo.)
 export interface IPnPjsOptions {
   useCache: boolean;
-  useBatching: boolean;
-  batchSize: number;
 }
 
 // Configuration for the elevated Azure Functions API (apiDemo). Public and
@@ -87,10 +85,7 @@ export class ServiceFactory {
         // served from sessionStorage on repeat calls.
         sp.using(Caching({ store: 'session' }));
       }
-      return new PnPjsSpService(sp, {
-        useBatching: options?.useBatching ?? false,
-        batchSize: options?.batchSize ?? 5
-      });
+      return new PnPjsSpService(sp);
     }
 
     if (transport === 'PnPjs' && endpoint === 'MS Graph (SP)') {
@@ -99,10 +94,7 @@ export class ServiceFactory {
       if (options?.useCache) {
         graph.using(Caching({ store: 'session' }));
       }
-      return new PnPjsGraphSpService(graph, site.id, {
-        useBatching: options?.useBatching ?? false,
-        batchSize: options?.batchSize ?? 5
-      });
+      return new PnPjsGraphSpService(graph, site.id);
     }
 
     // The elevated-API endpoints call the apiDemo Azure Function (write app-only).

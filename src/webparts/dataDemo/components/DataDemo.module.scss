@@ -99,23 +99,27 @@
     }
   }
 
-  // PnPjs-only options row (Use Cache / Use Batching). Only renders on the PnPjs
-  // tabs, so it always shows the PnPjs accent; a faint fill sets it apart.
-  .pnpOptions {
-    padding: 8px 12px;
-    background-color: var(--demo-accent-faint);
-    border-radius: 4px;
+  // PnPjs-only Use Cache checkbox sitting in the CRUD toolbar — accent label,
+  // accent fill when checked, with a little gap from the buttons.
+  .useCacheCheckbox {
+    margin-left: 8px;
 
-    :global(.ms-Checkbox-text),
-    :global(.ms-Label) {
+    :global(.ms-Checkbox-text) {
       color: var(--demo-accent);
     }
 
-    // Checked box takes the accent fill/border.
     :global(.ms-Checkbox.is-checked .ms-Checkbox-checkbox) {
       background-color: var(--demo-accent);
       border-color: var(--demo-accent);
     }
+  }
+
+  // Summary line shown after a batch demo run — the request-count payoff.
+  .batchDemoResult {
+    margin-top: 8px;
+    font-size: 13px;
+    text-align: center;
+    color: var(--demo-accent);
   }
 
   // Output region: text reflects the active transport.
@@ -156,10 +160,11 @@
       color: var(--neutralTertiary, #a19f9d) !important;
     }
 
-    // Add Item button takes the active transport accent as its fill — but only
-    // while enabled. When disabled it falls back to a greyed-out look instead of
-    // the accent override.
-    .addButton {
+    // Add Item / Batch Demo buttons take the active transport accent as their
+    // fill — but only while enabled. When disabled they fall back to a greyed-out
+    // look instead of the accent override.
+    .addButton,
+    .batchDemoButton {
       &,
       &:hover,
       &:active {
@@ -196,6 +201,19 @@
       :global(.ms-Button-icon) {
         color: var(--demo-accent);
       }
+    }
+
+    // Toolbar: Add/Refresh stay centered; the PnPjs Cache + Batch Demo group is
+    // pinned to the far right without shifting the centered pair.
+    .toolbar {
+      position: relative;
+    }
+
+    .toolbarRight {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
     }
   }
 }

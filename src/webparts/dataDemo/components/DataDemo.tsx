@@ -6,6 +6,7 @@ import styles from './DataDemo.module.scss';
 import type { IDataDemoProps } from './IDataDemoProps';
 import { IEventItem, ISpeaker, SessionType } from '../models/IEventItem';
 import { ISpService } from '../models/ISpService';
+import { IBatchDemoService, IBatchDemoResult } from '../models/IBatchDemoService';
 import { IJokeService } from '../models/IJokeService';
 import { IGraphQueryService } from '../models/IGraphQueryService';
 import { Transport, Endpoint, IListPermissions, IPnPjsOptions } from '../services/ServiceFactory';
@@ -35,9 +36,7 @@ import {
   DatePicker,
   Dropdown,
   IDropdownOption,
-  Checkbox,
-  SpinButton,
-  Position
+  Checkbox
 } from '@fluentui/react';
 import { PeoplePicker, PrincipalType } from '@pnp/spfx-controls-react/lib/PeoplePicker';
 
@@ -53,6 +52,10 @@ const SESSION_TYPE_OPTIONS: IDropdownOption[] = [
 ];
 
 const stackTokens: IStackTokens = { childrenGap: 10 };
+
+// Fixed batch size for the lifecycle demo (10-item phases fit in one $batch;
+// Graph caps a $batch at 20 anyway). No longer user-adjustable.
+const BATCH_DEMO_SIZE = 20;
 
 // 'Simple Auth' and 'Entra App' are now backed by the elevated Azure Functions
 // API (see ServiceFactory), so no endpoints render the "not implemented"
@@ -116,11 +119,12 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   // The signed-in user's own permissions on the list (NO_PERMISSIONS until resolved).
   const [permissions, setPermissions] = React.useState<IListPermissions>(NO_PERMISSIONS);
   const [permissionsLoaded, setPermissionsLoaded] = React.useState(false);
-  // PnPjs-only capability toggles (caching + batching). Ignored by every other
-  // transport/endpoint; the checkboxes only render on the PnPjs data tabs.
+  // PnPjs-only option. `useCache` toggles the Caching behavior; only surfaces on
+  // the PnPjs data tabs.
   const [useCache, setUseCache] = React.useState(false);
-  const [useBatching, setUseBatching] = React.useState(false);
-  const [batchSize, setBatchSize] = React.useState(5);
+  // The batch lifecycle demo: running flag + the last run's request summary.
+  const [batchDemoRunning, setBatchDemoRunning] = React.useState(false);
+  const [batchDemoResult, setBatchDemoResult] = React.useState<IBatchDemoResult | undefined>(undefined);
 
   const isAnonymous = endpoint === 'Anonymous';
 
@@ -135,19 +139,21 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   const isElevated = ELEVATED_ENDPOINTS.indexOf(endpoint) >= 0;
   const effectivePermissions = isElevated ? FULL_PERMISSIONS : permissions;
 
-  const loadItems = React.useCallback(async (svc: ISpService, lst: typeof list): Promise<void> => {
+  // `silent` skips the loading spinner — used for live refreshes between batch
+  // demo phases so the table updates in place without flickering to a spinner.
+  const loadItems = React.useCallback(async (svc: ISpService, lst: typeof list, silent = false): Promise<void> => {
     Logger.info(`loadItems: requesting items from list ${lst?.title ?? '(none)'}`);
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(undefined);
 
     try {
       const result = await svc.getItems(lst ?? { title: '', id: '' });
       Logger.debug(`loadItems: received ${result.length} item(s)`, result);
       setItems(result);
-      setLoading(false);
+      if (!silent) setLoading(false);
     } catch (err) {
       Logger.error(`loadItems failed: ${(err as Error).message}`, err);
-      setLoading(false);
+      if (!silent) setLoading(false);
       setError(`Failed to load items: ${(err as Error).message}`);
     }
   }, []);
@@ -212,6 +218,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
       setGraphQueryService(undefined);
       setItems([]);
       setError(undefined);
+      setBatchDemoResult(undefined);
       return newTransport;
     });
     // The free-form Graph endpoint is SPFx-only; fall back to SharePoint if hidden.
@@ -231,6 +238,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
       setGraphQueryService(undefined);
       setItems([]);
       setError(undefined);
+      setBatchDemoResult(undefined);
       return newEndpoint;
     });
   }, []);
@@ -277,10 +285,10 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
       Logger.debug(`endpoint ${endpoint} is a placeholder, skipping service init`);
       return;
     }
-    Logger.debug(`init effect: site=${site?.id ?? 'none'}, list=${list?.id ?? 'none'}, transport=${transport}, endpoint=${endpoint}, cache=${useCache}, batching=${useBatching}, batchSize=${batchSize}`);
-    initServiceAndLoad(transport, endpoint, factory, site, list, { useCache, useBatching, batchSize })
+    Logger.debug(`init effect: site=${site?.id ?? 'none'}, list=${list?.id ?? 'none'}, transport=${transport}, endpoint=${endpoint}, cache=${useCache}`);
+    initServiceAndLoad(transport, endpoint, factory, site, list, { useCache })
       .catch(() => { /* handled internally */ });
-  }, [factory, site?.id, list?.id, transport, endpoint, useCache, useBatching, batchSize]);
+  }, [factory, site?.id, list?.id, transport, endpoint, useCache]);
 
   const onAddItem = React.useCallback((): void => {
     setShowDialog(true);
@@ -335,6 +343,32 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
       Logger.error(`onDeleteItem failed: ${(err as Error).message}`, err);
       setLoading(false);
       setError(`Failed to delete item: ${(err as Error).message}`);
+    }
+  }, [spService, list, loadItems]);
+
+  // Runs the PnPjs batch lifecycle demo (cleanup → create → update → delete-odd),
+  // refreshing the table after each phase so the audience sees it happen live.
+  const onRunBatchDemo = React.useCallback(async (): Promise<void> => {
+    const demo = spService as Partial<IBatchDemoService> | undefined;
+    if (!demo?.runBatchDemo || !list) return;
+
+    Logger.info(`onRunBatchDemo: starting (batchSize=${BATCH_DEMO_SIZE})`);
+    setBatchDemoRunning(true);
+    setBatchDemoResult(undefined);
+    setError(undefined);
+
+    try {
+      const result = await demo.runBatchDemo(list, BATCH_DEMO_SIZE, async (phase) => {
+        Logger.info(`batch demo: ${phase.label} — ${phase.operations} op(s) in ${phase.requests} $batch request(s)`);
+        await loadItems(spService!, list, true);
+      });
+      Logger.debug('onRunBatchDemo result:', result);
+      setBatchDemoResult(result);
+    } catch (err) {
+      Logger.error(`onRunBatchDemo failed: ${(err as Error).message}`, err);
+      setError(`Batch demo failed: ${(err as Error).message}`);
+    } finally {
+      setBatchDemoRunning(false);
     }
   }, [spService, list, loadItems]);
 
@@ -457,24 +491,63 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
           </MessageBar>
         )}
 
-        <Stack horizontal tokens={stackTokens} horizontalAlign="center">
-          <PrimaryButton
-            text="Add Item"
-            iconProps={{ iconName: 'Add' }}
-            onClick={onAddItem}
-            disabled={!effectivePermissions.canAdd}
-            title={effectivePermissions.canAdd ? undefined : 'You have read-only access to this list.'}
-            className={styles.addButton}
-            data-automation-id="dataDemo-button-add"
-          />
-          <DefaultButton
-            text="Refresh"
-            iconProps={{ iconName: 'Refresh' }}
-            onClick={() => loadItems(spService, list)}
-            className={styles.refreshButton}
-            data-automation-id="dataDemo-button-refresh"
-          />
-        </Stack>
+        <div className={styles.toolbar}>
+          <Stack horizontal verticalAlign="center" tokens={stackTokens} horizontalAlign="center">
+            <PrimaryButton
+              text="Add Item"
+              iconProps={{ iconName: 'Add' }}
+              onClick={onAddItem}
+              disabled={!effectivePermissions.canAdd}
+              title={effectivePermissions.canAdd ? undefined : 'You have read-only access to this list.'}
+              className={styles.addButton}
+              data-automation-id="dataDemo-button-add"
+            />
+            <DefaultButton
+              text="Refresh"
+              iconProps={{ iconName: 'Refresh' }}
+              onClick={() => { setBatchDemoResult(undefined); loadItems(spService, list).catch(() => { /* handled */ }); }}
+              className={styles.refreshButton}
+              data-automation-id="dataDemo-button-refresh"
+            />
+          </Stack>
+
+          {supportsPnpOptions && (
+            <Stack horizontal verticalAlign="center" tokens={stackTokens} className={styles.toolbarRight}>
+              <Checkbox
+                label="Use Cache"
+                checked={useCache}
+                onChange={(_e, checked) => setUseCache(!!checked)}
+                className={styles.useCacheCheckbox}
+                data-automation-id="dataDemo-checkbox-cache"
+              />
+              <PrimaryButton
+                text={batchDemoRunning ? 'Running…' : 'Batch Demo'}
+                iconProps={{ iconName: 'Lightningbolt' }}
+                onClick={onRunBatchDemo}
+                disabled={
+                  batchDemoRunning ||
+                  !effectivePermissions.canAdd || !effectivePermissions.canEdit || !effectivePermissions.canDelete
+                }
+                title={
+                  effectivePermissions.canAdd && effectivePermissions.canEdit && effectivePermissions.canDelete
+                    ? 'Create, update, and delete SAMPLE items — each phase sent as one $batch.'
+                    : 'Needs add/edit/delete permission on this list.'
+                }
+                className={styles.batchDemoButton}
+                data-automation-id="dataDemo-button-batchdemo"
+              />
+            </Stack>
+          )}
+        </div>
+
+        {supportsPnpOptions && batchDemoResult && (
+          <div className={styles.batchDemoResult} data-automation-id="dataDemo-batchdemo-result">
+            {batchDemoResult.totalOperations} operations in{' '}
+            <strong>{batchDemoResult.totalRequests} $batch request(s)</strong>{' '}
+            (batch size {batchDemoResult.batchSize}) —{' '}
+            {batchDemoResult.phases.map((p) => `${p.name} ${p.operations}`).join(', ')}
+          </div>
+        )}
 
         <DetailsList
           items={items}
@@ -624,41 +697,6 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
             <PivotItem headerText="Entra App" itemKey="Entra App" />
           </Pivot>
         </div>
-
-        {supportsPnpOptions && (
-          <div className={styles.pnpOptions} data-automation-id="dataDemo-pnp-options">
-            <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 24 }}>
-              <Checkbox
-                label="Use Cache"
-                checked={useCache}
-                onChange={(_e, checked) => setUseCache(!!checked)}
-                data-automation-id="dataDemo-checkbox-cache"
-              />
-              <Checkbox
-                label="Use Batching"
-                checked={useBatching}
-                onChange={(_e, checked) => setUseBatching(!!checked)}
-                data-automation-id="dataDemo-checkbox-batching"
-              />
-              {useBatching && (
-                <SpinButton
-                  label="Requests per $batch"
-                  labelPosition={Position.top}
-                  min={1}
-                  max={20}
-                  step={1}
-                  value={String(batchSize)}
-                  styles={{ root: { width: 150 } }}
-                  onChange={(_e, val) => {
-                    const n = parseInt(val ?? '', 10);
-                    if (!isNaN(n)) setBatchSize(Math.min(20, Math.max(1, n)));
-                  }}
-                  data-automation-id="dataDemo-spin-batchsize"
-                />
-              )}
-            </Stack>
-          </div>
-        )}
 
         <div className={styles.output}>
           {PLACEHOLDER_ENDPOINTS.indexOf(endpoint) >= 0
