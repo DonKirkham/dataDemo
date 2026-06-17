@@ -9,17 +9,24 @@
   color: "[theme:bodyText, default: #323130]";
   color: var(--bodyText);
 
-  // Accent driven by the selected first-tier transport. Inherited by the second
-  // tier and the output region so they reflect SPFx (blue) vs PnPjs (darkred).
-  --demo-accent: blue;
+  // ---- Theme -----------------------------------------------------------
+  // Single source of truth: each brand is one RGB triplet. Every other shade
+  // (the solid accent, faded accent text, faint tab fill) is derived from the
+  // triplet as an alpha fade — so swapping the theme only swaps one variable,
+  // --demo-accent-rgb, and everything downstream follows.
+  --demo-spfx-rgb: 0, 0, 200;    // dark blue    — SPFx transport
+  --demo-pnpjs-rgb: 200, 0, 0;   // darkred — PnPjs transport
 
-  &.transportSpfxActive {
-    --demo-accent: blue;
-  }
+  // Active accent, driven by the selected first-tier transport and inherited
+  // by the second tier, the output region, and the joke punchline. Defaults to
+  // SPFx; the transport modifier classes below swap the triplet.
+  --demo-accent-rgb: var(--demo-spfx-rgb);
+  --demo-accent: rgb(var(--demo-accent-rgb));
+  --demo-accent-faded: rgba(var(--demo-accent-rgb), 0.65); // softened text
+  --demo-accent-faint: rgba(var(--demo-accent-rgb), 0.15); // faint fill
 
-  &.transportPnpjsActive {
-    --demo-accent: darkred;
-  }
+  &.transportSpfxActive  { --demo-accent-rgb: var(--demo-spfx-rgb); }
+  &.transportPnpjsActive { --demo-accent-rgb: var(--demo-pnpjs-rgb); }
 
   .pivotWrapper {
     display: flex;
@@ -38,30 +45,31 @@
     }
   }
 
-  // First tier (transport). Inactive tabs use a faded fill of their color with
-  // full-color text; the active tab uses the full color with white text and a
-  // white selection underline.
+  // First tier (transport). Both tabs are always visible, each in its own brand
+  // color (not the active accent): inactive uses a faint fill of that brand with
+  // full-color text; active uses the solid brand with white text and a white
+  // selection underline. Every shade is a fade of the same brand triplet.
   .transportPivot {
-    // Inactive: faded background, full-color text.
+    // Inactive: faint background, full-color text.
     :global(.ms-Pivot-link[data-tab='spfx']) {
-      color: blue;
-      background-color: rgba(0, 0, 255, 0.15);
+      color: rgb(var(--demo-spfx-rgb));
+      background-color: rgba(var(--demo-spfx-rgb), 0.15);
     }
 
     :global(.ms-Pivot-link[data-tab='pnpjs']) {
-      color: darkred;
-      background-color: rgba(139, 0, 0, 0.15);
+      color: rgb(var(--demo-pnpjs-rgb));
+      background-color: rgba(var(--demo-pnpjs-rgb), 0.15);
     }
 
-    // Active: full-color background, white text.
+    // Active: solid background, white text.
     :global(.ms-Pivot-link.is-selected[data-tab='spfx']) {
       color: white;
-      background-color: blue;
+      background-color: rgb(var(--demo-spfx-rgb));
     }
 
     :global(.ms-Pivot-link.is-selected[data-tab='pnpjs']) {
       color: white;
-      background-color: darkred;
+      background-color: rgb(var(--demo-pnpjs-rgb));
     }
 
     // Active: white selection underline (Fluent draws it via ::before).
@@ -71,12 +79,23 @@
     }
   }
 
-  // Second tier (endpoint): text reflects the active transport.
+  // Second tier (endpoint): every tab takes the active transport accent. The
+  // selected tab adds a faint accent fill and an accent underline (Fluent draws
+  // the underline via ::before, which otherwise shows the site theme color).
   .endpointPivot {
     :global(.ms-Pivot-link),
     :global(.ms-Pivot-link.is-selected) {
       color: var(--demo-accent);
       font-size: 17px;
+    }
+
+    :global(.ms-Pivot-link.is-selected) {
+      background-color: var(--demo-accent-faint);
+      border-radius: 4px 4px 0 0;
+    }
+
+    :global(.ms-Pivot-link.is-selected)::before {
+      background-color: var(--demo-accent);
     }
   }
 
@@ -89,13 +108,38 @@
       color: var(--demo-accent);
     }
 
+    // Darken row text to black so it reads clearly and stays distinct from the
+    // muted grey of the disabled action icons. The Event Site link matches.
+    :global(.ms-DetailsRow-cell),
+    :global(.ms-DetailsRow-cell a),
+    :global(.ms-DetailsRow-cell a:hover),
+    :global(.ms-DetailsRow-cell a:active),
+    :global(.ms-DetailsRow-cell a:visited) {
+      color: #000;
+    }
+
     // In-row action icons (Edit/Delete) follow the accent. Scoped to the
     // DetailsList so the Add/Refresh toolbar buttons above it are unaffected.
     :global(.ms-DetailsList .ms-Button-icon) {
       color: var(--demo-accent);
     }
 
-    // Add Item button takes the active transport accent as its fill.
+    // Disabled in-row action icons: keep the background transparent (normal) and
+    // mute the icon to the same grey as the disabled Add button label, rather
+    // than the accent color above.
+    :global(.ms-DetailsList .ms-Button.is-disabled),
+    :global(.ms-DetailsList .ms-Button:disabled) {
+      background-color: transparent !important;
+    }
+
+    :global(.ms-DetailsList .ms-Button.is-disabled .ms-Button-icon),
+    :global(.ms-DetailsList .ms-Button:disabled .ms-Button-icon) {
+      color: var(--neutralTertiary, #a19f9d) !important;
+    }
+
+    // Add Item button takes the active transport accent as its fill — but only
+    // while enabled. When disabled it falls back to a greyed-out look instead of
+    // the accent override.
     .addButton {
       &,
       &:hover,
@@ -103,6 +147,20 @@
         background-color: var(--demo-accent);
         border-color: var(--demo-accent);
         color: white;
+      }
+
+      // Fluent flags a disabled button with the `is-disabled` class (and may not
+      // set the native :disabled attribute). !important overrides the accent fill
+      // above so the disabled button reads as greyed-out.
+      &:disabled,
+      &:global(.is-disabled) {
+        background-color: var(--neutralLighter, #f3f2f1) !important;
+        border-color: var(--neutralLight, #edebe9) !important;
+
+        &,
+        :global(.ms-Button-label) {
+          color: var(--neutralTertiary, #a19f9d) !important;
+        }
       }
     }
 
@@ -164,9 +222,21 @@
   }
 }
 
-// Nudge the loading spinner down so it clears the toolbar above it.
+// Nudge the loading spinner down so it clears the toolbar above it, and tint it
+// with the active transport accent (cascaded from the .dataDemo ancestor) so it
+// matches the theme instead of the default site primary color.
 .loadingSpinner {
   margin-top: 3.125rem; // 50px
+
+  :global(.ms-Spinner-circle) {
+    // Full ring (track) in a faint accent, moving arc in the full accent.
+    border-color: var(--demo-accent-faint);
+    border-top-color: var(--demo-accent);
+  }
+
+  :global(.ms-Spinner-label) {
+    color: var(--demo-accent);
+  }
 }
 
 .placeholder {
