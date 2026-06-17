@@ -16,23 +16,27 @@
     font-size: 32px;
     font-weight: 600;
     line-height: 1.4;
-    color: var(--themePrimary, #0078d4);
-    animation: fadeIn 600ms ease-in forwards;
+    // Italicized, in a lightly-faded transport accent.
+    font-style: italic;
+    color: var(--demo-accent-faded, rgba(0, 0, 255, 0.65));
+    // Setup shows immediately; punchline reveals 2s later. `both` keeps it
+    // hidden during the delay and visible afterward.
+    animation: fadeIn 600ms ease-in 2s both;
   }
 }
 
 .nextButton {
-  opacity: 0;
-  animation: fadeIn 600ms ease-in 3s forwards;
+  // Reveals 1s after the punchline (3s total). `both` keeps it hidden during
+  // the delay and visible afterward.
+  animation: fadeIn 600ms ease-in 3s both;
 
+  // Same fill as the Add Item button: the transport accent with white text.
   :global(.ms-Button) {
-    background-color: var(--themePrimary, #0078d4);
-    color: #ffffff;
-    border: none;
-
-    &:hover {
-      background-color: var(--themePrimary, #0078d4);
-      opacity: 0.9;
+    &,
+    &:hover,
+    &:active {
+      background-color: var(--demo-accent, blue);
+      border-color: var(--demo-accent, blue);
       color: #ffffff;
     }
   }

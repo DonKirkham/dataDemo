@@ -21,20 +21,14 @@ export interface IJokePanelProps {
 const JokePanel: React.FC<IJokePanelProps> = ({ service }) => {
   const [setup, setSetup] = React.useState('');
   const [punchline, setPunchline] = React.useState('');
-  const [showPunchline, setShowPunchline] = React.useState(false);
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | undefined>(undefined);
-  const timerRef = React.useRef<number | undefined>(undefined);
+  // Bumped on every successful load so the CSS reveal animations replay per joke.
+  const [round, setRound] = React.useState(0);
 
   const loadJoke = React.useCallback((): void => {
-    if (timerRef.current) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = undefined;
-    }
-
     setLoading(true);
     setError(undefined);
-    setShowPunchline(false);
 
     Logger.info(`loadJoke: GET ${service.url}`);
 
@@ -42,11 +36,8 @@ const JokePanel: React.FC<IJokePanelProps> = ({ service }) => {
       Logger.debug('loadJoke: received joke', joke);
       setSetup(joke.setup);
       setPunchline(joke.punchline);
+      setRound((r) => r + 1);
       setLoading(false);
-
-      timerRef.current = window.setTimeout(() => {
-        setShowPunchline(true);
-      }, 3000);
     }).catch((err: Error) => {
       Logger.error(`loadJoke failed: ${err.message}`, err);
       setLoading(false);
@@ -56,11 +47,6 @@ const JokePanel: React.FC<IJokePanelProps> = ({ service }) => {
 
   React.useEffect(() => {
     loadJoke();
-    return () => {
-      if (timerRef.current) {
-        window.clearTimeout(timerRef.current);
-      }
-    };
   }, [loadJoke]);
 
   return (
@@ -75,28 +61,29 @@ const JokePanel: React.FC<IJokePanelProps> = ({ service }) => {
         </MessageBar>
       )}
 
-      <div className={styles.jokePanel} data-automation-id="dataDemo-container-joke">
-        {loading ? (
+      {loading ? (
+        <div className={styles.jokePanel} data-automation-id="dataDemo-container-joke">
           <Spinner size={SpinnerSize.large} label="Fetching joke..." data-automation-id="dataDemo-spinner-loading" />
-        ) : (
-          <>
+        </div>
+      ) : (
+        // key={round} remounts the subtree on each joke so the CSS reveal
+        // animations (punchline at 2s, button at 3s) restart from the beginning.
+        // All timing lives in JokePanel.module.scss — no JS timers.
+        <React.Fragment key={round}>
+          <div className={styles.jokePanel} data-automation-id="dataDemo-container-joke">
             <div className={styles.setup} data-automation-id="dataDemo-text-setup">{setup}</div>
-            {showPunchline && (
-              <div className={styles.punchline} data-automation-id="dataDemo-text-punchline">{punchline}</div>
-            )}
-          </>
-        )}
-      </div>
+            <div className={styles.punchline} data-automation-id="dataDemo-text-punchline">{punchline}</div>
+          </div>
 
-      {showPunchline && (
-        <Stack horizontalAlign="center" className={styles.nextButton}>
-          <DefaultButton
-            text="Next Joke"
-            iconProps={{ iconName: 'Refresh' }}
-            onClick={loadJoke}
-            data-automation-id="dataDemo-button-nextjoke"
-          />
-        </Stack>
+          <Stack horizontalAlign="center" className={styles.nextButton}>
+            <DefaultButton
+              text="Next Joke"
+              iconProps={{ iconName: 'Refresh' }}
+              onClick={loadJoke}
+              data-automation-id="dataDemo-button-nextjoke"
+            />
+          </Stack>
+        </React.Fragment>
       )}
     </>
   );
