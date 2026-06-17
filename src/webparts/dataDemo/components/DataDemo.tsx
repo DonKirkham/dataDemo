@@ -8,7 +8,7 @@ import { IEventItem, ISpeaker, SessionType } from '../models/IEventItem';
 import { ISpService } from '../models/ISpService';
 import { IJokeService } from '../models/IJokeService';
 import { IGraphQueryService } from '../models/IGraphQueryService';
-import { Transport, Endpoint } from '../services/ServiceFactory';
+import { Transport, Endpoint, IListPermissions } from '../services/ServiceFactory';
 import JokePanel from './JokePanel';
 import GraphExplorer from './GraphExplorer';
 import { Logger } from '../utilities/logger';
@@ -56,6 +56,14 @@ const stackTokens: IStackTokens = { childrenGap: 10 };
 // placeholder anymore. Kept as an explicit list for future additions.
 const PLACEHOLDER_ENDPOINTS: Endpoint[] = [];
 
+// The elevated-API endpoints write app-only via the Azure Function, so their
+// Add/Edit/Delete actions stay enabled regardless of the user's own list
+// permissions. Every other (user-identity) endpoint is gated on those perms.
+const ELEVATED_ENDPOINTS: Endpoint[] = ['Simple Auth', 'Entra App'];
+
+const FULL_PERMISSIONS: IListPermissions = { canRead: true, canAdd: true, canEdit: true, canDelete: true };
+const NO_PERMISSIONS: IListPermissions = { canRead: false, canAdd: false, canEdit: false, canDelete: false };
+
 const QUERY_PARAM_TRANSPORT = 'transport';
 const QUERY_PARAM_ENDPOINT = 'endpoint';
 
@@ -101,8 +109,17 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
   const [spService, setSpService] = React.useState<ISpService | undefined>(undefined);
   const [jokeService, setJokeService] = React.useState<IJokeService | undefined>(undefined);
   const [graphQueryService, setGraphQueryService] = React.useState<IGraphQueryService | undefined>(undefined);
+  // The signed-in user's own permissions on the list (NO_PERMISSIONS until resolved).
+  const [permissions, setPermissions] = React.useState<IListPermissions>(NO_PERMISSIONS);
+  const [permissionsLoaded, setPermissionsLoaded] = React.useState(false);
 
   const isAnonymous = endpoint === 'Anonymous';
+
+  // On the elevated-API tabs the Azure Function writes app-only, so the user's
+  // own permissions don't apply — Add/Edit/Delete stay enabled. Everywhere else
+  // the buttons follow the user's effective list permissions.
+  const isElevated = ELEVATED_ENDPOINTS.indexOf(endpoint) >= 0;
+  const effectivePermissions = isElevated ? FULL_PERMISSIONS : permissions;
 
   const loadItems = React.useCallback(async (svc: ISpService, lst: typeof list): Promise<void> => {
     Logger.info(`loadItems: requesting items from list ${lst?.title ?? '(none)'}`);
@@ -179,6 +196,8 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
       setSpService(undefined);
       setJokeService(undefined);
       setGraphQueryService(undefined);
+      setItems([]);
+      setError(undefined);
       return newTransport;
     });
     // The free-form Graph endpoint is SPFx-only; fall back to SharePoint if hidden.
@@ -196,6 +215,8 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
       setSpService(undefined);
       setJokeService(undefined);
       setGraphQueryService(undefined);
+      setItems([]);
+      setError(undefined);
       return newEndpoint;
     });
   }, []);
@@ -213,6 +234,28 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
     const newUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
     window.history.replaceState(undefined, '', newUrl);
   }, [transport, endpoint]);
+
+  // Resolve the user's effective list permissions whenever the target list
+  // changes. Endpoint-independent: it reflects what the user can do directly.
+  React.useEffect(() => {
+    if (!factory || !site?.id || !list?.id) {
+      setPermissions(NO_PERMISSIONS);
+      setPermissionsLoaded(false);
+      return;
+    }
+    setPermissionsLoaded(false);
+    factory.getListPermissions(site, list)
+      .then((perms) => {
+        Logger.debug(`permissions: read=${perms.canRead}, add=${perms.canAdd}, edit=${perms.canEdit}, delete=${perms.canDelete}`);
+        setPermissions(perms);
+        setPermissionsLoaded(true);
+      })
+      .catch((err) => {
+        Logger.error(`failed to read list permissions: ${(err as Error).message}`, err);
+        setPermissions(NO_PERMISSIONS);
+        setPermissionsLoaded(true);
+      });
+  }, [factory, site?.id, list?.id]);
 
   // Initialize on mount and re-initialize when inputs change
   React.useEffect(() => {
@@ -299,6 +342,23 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
       );
     }
 
+    // On the user-identity endpoints, wait until the user's list permissions are
+    // known, then block the whole panel if they can't read the list.
+    if (!isElevated && !permissionsLoaded) {
+      return (
+        <Spinner size={SpinnerSize.large} label="Checking permissions..." className={styles.loadingSpinner} data-automation-id="dataDemo-spinner-permissions" />
+      );
+    }
+
+    if (!effectivePermissions.canRead) {
+      return (
+        <MessageBar messageBarType={MessageBarType.warning} data-automation-id="dataDemo-message-noaccess">
+          You don&rsquo;t have access to view <strong>{list.title}</strong>. Ask the site owner to grant
+          you at least Read permission on this list, then refresh the page.
+        </MessageBar>
+      );
+    }
+
     const columns: IColumn[] = [
       {
         key: 'actions',
@@ -309,15 +369,17 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
           <Stack horizontal tokens={{ childrenGap: 4 }}>
             <IconButton
               iconProps={{ iconName: 'Edit' }}
-              title="Edit"
+              title={effectivePermissions.canEdit ? 'Edit' : 'You have read-only access to this list.'}
               ariaLabel="Edit item"
+              disabled={!effectivePermissions.canEdit}
               data-automation-id={`dataDemo-button-edit-${item.Id}`}
               onClick={() => onEditItem(item)}
             />
             <IconButton
               iconProps={{ iconName: 'Delete' }}
-              title="Delete"
+              title={effectivePermissions.canDelete ? 'Delete' : 'You have read-only access to this list.'}
               ariaLabel="Delete item"
+              disabled={!effectivePermissions.canDelete}
               data-automation-id={`dataDemo-button-delete-${item.Id}`}
               onClick={() => onDeleteItem(item.Id!)}
             />
@@ -379,6 +441,8 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
             text="Add Item"
             iconProps={{ iconName: 'Add' }}
             onClick={onAddItem}
+            disabled={!effectivePermissions.canAdd}
+            title={effectivePermissions.canAdd ? undefined : 'You have read-only access to this list.'}
             className={styles.addButton}
             data-automation-id="dataDemo-button-add"
           />
@@ -392,7 +456,7 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
         </Stack>
 
         {loading ? (
-          <Spinner size={SpinnerSize.large} label="Loading items..." data-automation-id="dataDemo-spinner-loading" />
+          <Spinner size={SpinnerSize.large} label="Loading items..." className={styles.loadingSpinner} data-automation-id="dataDemo-spinner-loading" />
         ) : (
           <DetailsList
             items={items}
@@ -495,7 +559,10 @@ const DataDemo: React.FC<IDataDemoProps> = ({ factory, site, list }) => {
             <PrimaryButton
               text="Save"
               onClick={onSaveItem}
-              disabled={!editItem.Title || !editItem.SessionDate}
+              disabled={
+                !editItem.Title || !editItem.SessionDate ||
+                (isEditing ? !effectivePermissions.canEdit : !effectivePermissions.canAdd)
+              }
               data-automation-id="dataDemo-button-save"
             />
             <DefaultButton

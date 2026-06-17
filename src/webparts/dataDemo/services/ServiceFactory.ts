@@ -3,10 +3,14 @@
 
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { spfi, SPFx as spSPFx } from '@pnp/sp';
+import '@pnp/sp/webs';
+import '@pnp/sp/lists';
+import '@pnp/sp/security';
+import { PermissionKind } from '@pnp/sp/security';
 import { graphfi, SPFx as graphSPFx } from '@pnp/graph';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Caching } from '@pnp/queryable';
-import { ISpService } from '../models/ISpService';
+import { ISpService, IListIdentifier } from '../models/ISpService';
 import { IJokeService } from '../models/IJokeService';
 import { IGraphQueryService } from '../models/IGraphQueryService';
 import { SpfxSpService } from './SpfxSpService';
@@ -32,6 +36,16 @@ export interface ISiteInfo {
 export interface IApiConfig {
   baseUrl: string;
   resourceUri: string;
+}
+
+// The signed-in user's effective permissions on the target list. Used to gate
+// the read/write UI on the user-identity endpoints (the elevated API endpoints
+// read/write app-only, so they ignore these).
+export interface IListPermissions {
+  canRead: boolean;
+  canAdd: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
 export class ServiceFactory {
@@ -81,6 +95,22 @@ export class ServiceFactory {
     }
 
     throw new Error(`Unsupported SharePoint combination: ${transport} + ${endpoint}`);
+  }
+
+  // Reads the signed-in user's effective permissions on the target list, once
+  // per site/list. Independent of the selected endpoint — it reflects what the
+  // *user* can do directly, which is what the user-identity tabs are gated on.
+  public async getListPermissions(site: ISiteInfo, list: IListIdentifier): Promise<IListPermissions> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sp = spfi(site.url).using(spSPFx(this.context as any));
+    const splist = sp.web.lists.getByTitle(list.title);
+    const perms = await splist.getCurrentUserEffectivePermissions();
+    return {
+      canRead: splist.hasPermissions(perms, PermissionKind.ViewListItems),
+      canAdd: splist.hasPermissions(perms, PermissionKind.AddListItems),
+      canEdit: splist.hasPermissions(perms, PermissionKind.EditListItems),
+      canDelete: splist.hasPermissions(perms, PermissionKind.DeleteListItems)
+    };
   }
 
   public createJokeService(transport: Transport): IJokeService {

@@ -164,6 +164,11 @@
   }
 }
 
+// Nudge the loading spinner down so it clears the toolbar above it.
+.loadingSpinner {
+  margin-top: 3.125rem; // 50px
+}
+
 .placeholder {
   padding: 40px 20px;
   text-align: center;
