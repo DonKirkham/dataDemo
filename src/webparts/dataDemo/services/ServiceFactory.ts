@@ -16,6 +16,8 @@ import { PnPjsGraphSpService } from './PnPjsGraphSpService';
 import { SpfxAnonymousService } from './SpfxAnonymousService';
 import { PnPjsAnonymousService } from './PnPjsAnonymousService';
 import { SpfxGraphQueryService } from './SpfxGraphQueryService';
+import { ApiDomainSpService } from './ApiDomainSpService';
+import { ApiEntraSpService } from './ApiEntraSpService';
 
 export type Transport = 'SPFx' | 'PnPjs';
 export type Endpoint = 'SharePoint' | 'MS Graph (Explorer)' | 'MS Graph (SP)' | 'Anonymous' | 'Simple Auth' | 'Entra App';
@@ -25,8 +27,18 @@ export interface ISiteInfo {
   id: string;
 }
 
+// Configuration for the elevated Azure Functions API (apiDemo). Public and
+// mutable so the web part can refresh it from the property pane between renders.
+export interface IApiConfig {
+  baseUrl: string;
+  resourceUri: string;
+}
+
 export class ServiceFactory {
-  constructor(private _context: WebPartContext) {}
+  constructor(
+    private _context: WebPartContext,
+    public api: IApiConfig
+  ) {}
 
   public get context(): WebPartContext {
     return this._context;
@@ -54,6 +66,18 @@ export class ServiceFactory {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const graph = graphfi().using(graphSPFx(this.context as any));
       return new PnPjsGraphSpService(graph, site.id);
+    }
+
+    // The elevated-API endpoints call the apiDemo Azure Function, which performs
+    // the SharePoint write app-only. They behave identically under either
+    // transport, so the transport pivot does not branch them.
+    if (endpoint === 'Simple Auth') {
+      return new ApiDomainSpService(this.context.httpClient, this.api.baseUrl, site.url);
+    }
+
+    if (endpoint === 'Entra App') {
+      const aadClient = await this.context.aadHttpClientFactory.getClient(this.api.resourceUri);
+      return new ApiEntraSpService(aadClient, this.api.baseUrl, site.url);
     }
 
     throw new Error(`Unsupported SharePoint combination: ${transport} + ${endpoint}`);

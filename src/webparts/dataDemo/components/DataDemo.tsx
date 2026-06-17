@@ -51,7 +51,10 @@ const SESSION_TYPE_OPTIONS: IDropdownOption[] = [
 
 const stackTokens: IStackTokens = { childrenGap: 10 };
 
-const PLACEHOLDER_ENDPOINTS: Endpoint[] = ['Simple Auth', 'Entra App'];
+// 'Simple Auth' and 'Entra App' are now backed by the elevated Azure Functions
+// API (see ServiceFactory), so no endpoints render the "not implemented"
+// placeholder anymore. Kept as an explicit list for future additions.
+const PLACEHOLDER_ENDPOINTS: Endpoint[] = [];
 
 const QUERY_PARAM_TRANSPORT = 'transport';
 const QUERY_PARAM_ENDPOINT = 'endpoint';

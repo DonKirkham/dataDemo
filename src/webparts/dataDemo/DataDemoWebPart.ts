@@ -6,7 +6,8 @@ import * as ReactDom from 'react-dom';
 import { Version } from '@microsoft/sp-core-library';
 import {
   type IPropertyPaneConfiguration,
-  PropertyPaneToggle
+  PropertyPaneToggle,
+  PropertyPaneTextField
 } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import { IReadonlyTheme } from '@microsoft/sp-component-base';
@@ -36,11 +37,25 @@ export interface IDataDemoWebPartProps {
   sites: IPropertyFieldSite[];
   list: IStoredList | undefined;
   enhancedLogging: boolean;
+  apiBaseUrl: string;
+  apiResourceUri: string;
 }
+
+// Defaults point at the deployed apiDemo Azure Function and its app registration.
+// Override per-environment in the property pane.
+const DEFAULT_API_BASE_URL = 'https://apidemo-func-4r1iq2.azurewebsites.net';
+const DEFAULT_API_RESOURCE_URI = 'api://99b202da-a167-4232-b6d7-7e4bb7a2fdaa';
 
 export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebPartProps> {
 
   private _factory: ServiceFactory | undefined;
+
+  private _apiConfig(): { baseUrl: string; resourceUri: string } {
+    return {
+      baseUrl: this.properties.apiBaseUrl || DEFAULT_API_BASE_URL,
+      resourceUri: this.properties.apiResourceUri || DEFAULT_API_RESOURCE_URI
+    };
+  }
 
   public render(): void {
     const list = this.properties.list;
@@ -49,6 +64,11 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
     Logger.debug(`render: hasSite=${hasSite}, list=${list?.title ?? 'none'}`);
 
     ReactDom.unmountComponentAtNode(this.domElement);
+
+    // Keep the factory's API config in sync with the property pane between renders.
+    if (this._factory) {
+      this._factory.api = this._apiConfig();
+    }
 
     if (!hasSite || !list) {
       Logger.debug('render: showing configuration placeholder');
@@ -97,7 +117,7 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
       }];
     }
 
-    this._factory = new ServiceFactory(this.context);
+    this._factory = new ServiceFactory(this.context, this._apiConfig());
     Logger.debug('onInit: web part initialized, service factory ready');
     return Promise.resolve();
   }
@@ -187,6 +207,21 @@ export default class DataDemoWebPart extends BaseClientSideWebPart<IDataDemoWebP
             description: 'Advanced settings for the web part.'
           },
           groups: [
+            {
+              groupName: 'Elevated API',
+              groupFields: [
+                PropertyPaneTextField('apiBaseUrl', {
+                  label: 'API base URL',
+                  description: 'Base URL of the apiDemo Azure Function (Simple Auth / Entra App endpoints).',
+                  placeholder: DEFAULT_API_BASE_URL
+                }),
+                PropertyPaneTextField('apiResourceUri', {
+                  label: 'API resource URI (Entra App)',
+                  description: 'App ID URI the AadHttpClient requests a token for.',
+                  placeholder: DEFAULT_API_RESOURCE_URI
+                })
+              ]
+            },
             {
               groupName: 'Logging',
               groupFields: [
