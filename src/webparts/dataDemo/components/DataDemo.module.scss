@@ -15,7 +15,7 @@
   // triplet as an alpha fade — so swapping the theme only swaps one variable,
   // --demo-accent-rgb, and everything downstream follows.
   --demo-spfx-rgb: 0, 0, 200;    // dark blue    — SPFx transport
-  --demo-pnpjs-rgb: 200, 0, 0;   // darkred — PnPjs transport
+  --demo-pnpjs-rgb: 200, 0, 0;   // dark red — PnPjs transport
 
   // Active accent, driven by the selected first-tier transport and inherited
   // by the second tier, the output region, and the joke punchline. Defaults to
