@@ -21,6 +21,7 @@ import { PnPjsAnonymousService } from './PnPjsAnonymousService';
 import { SpfxGraphQueryService } from './SpfxGraphQueryService';
 import { ApiDomainSpService } from './ApiDomainSpService';
 import { ApiEntraSpService } from './ApiEntraSpService';
+import { PnPjsApiSpService } from './PnPjsApiSpService';
 
 export type Transport = 'SPFx' | 'PnPjs';
 export type Endpoint = 'SharePoint' | 'MS Graph (Explorer)' | 'MS Graph (SP)' | 'Anonymous' | 'Simple Auth' | 'Entra App';
@@ -98,12 +99,24 @@ export class ServiceFactory {
     }
 
     // The elevated-API endpoints call the apiDemo Azure Function (write app-only).
-    // They behave identically under either transport, so we don't branch on it.
+    // Both transports hit the same endpoint; only who makes the HTTP call differs:
+    // SPFx uses the native HttpClient/AadHttpClient, PnPjs uses its Queryable pipeline.
     if (endpoint === 'Simple Auth') {
+      if (transport === 'PnPjs') {
+        // Origin-restricted: no token — fetch's Origin header is the credential.
+        return new PnPjsApiSpService(this.api.baseUrl, site.url, 'domain');
+      }
       return new ApiDomainSpService(this.context.httpClient, this.api.baseUrl, site.url);
     }
 
     if (endpoint === 'Entra App') {
+      if (transport === 'PnPjs') {
+        // Acquire a bearer token for the API's app registration, then let PnPjs
+        // send it via the BearerToken behavior (no AadHttpClient involved).
+        const tokenProvider = await this.context.aadTokenProviderFactory.getTokenProvider();
+        const token = await tokenProvider.getToken(this.api.resourceUri);
+        return new PnPjsApiSpService(this.api.baseUrl, site.url, 'entra', token);
+      }
       const aadClient = await this.context.aadHttpClientFactory.getClient(this.api.resourceUri);
       return new ApiEntraSpService(aadClient, this.api.baseUrl, site.url);
     }
