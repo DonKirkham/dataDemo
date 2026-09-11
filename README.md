@@ -6,7 +6,7 @@ Demo project for sessions showing how to access data from SPFx solutions
 
 ## Used SharePoint Framework Version
 
-![version](https://img.shields.io/badge/version-1.22.2-green.svg)
+![version](https://img.shields.io/badge/version-1.23.2-green.svg)
 
 ## Applies to
 
